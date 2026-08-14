@@ -1,0 +1,137 @@
+services:
+  proxy:
+    environment:
+      NEXT_PROXY_DEFINES: ${OPENMRS_LOCAL_PROXY_DEFINES:--D NEXT_SHELL -D NEXT_REGISTRATION -D NEXT_CLINICAL -D NEXT_BEDMANAGEMENT -D NEXT_ADT -D LOCAL_OPENMRS}
+    depends_on:
+      openmrs-local:
+        condition: service_healthy
+
+  bahmni-next-web:
+    environment:
+      NEXT_PUBLIC_AUTH_MODE: ${AUTH_MODE:-keycloak}
+
+  keycloak-configurator:
+    environment:
+      # Keycloak and OpenMRS share the private Compose network locally. This avoids
+      # routing a security callback through the browser-facing development proxy.
+      OPENMRS_BACKCHANNEL_LOGOUT_URL: http://openmrs-local:8080/openmrs/oauth2backchannellogout
+
+  openmrs-local-db:
+    image: ${OPENMRS_LOCAL_DB_IMAGE:?}
+    profiles: ["local-openmrs"]
+    command: ["--sql-mode=STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION"]
+    environment:
+      TZ: ${TZ:-America/Santiago}
+      MYSQL_DATABASE: ${OPENMRS_LOCAL_DB_NAME:-openmrs}
+      MYSQL_USER: ${OPENMRS_LOCAL_DB_USER:-openmrs-local}
+      MYSQL_PASSWORD_FILE: /run/secrets/openmrs_local_db_password
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/openmrs_local_db_root_password
+    secrets:
+      - openmrs_local_db_password
+      - openmrs_local_db_root_password
+    volumes:
+      - openmrs-local-db-data:/var/lib/mysql
+      - ./openmrs-local/snapshots:/snapshot
+      - ./openmrs-local/isolate-clone.sql:/opt/hcsba/isolate-clone.sql:ro
+      - ./openmrs-local/local-db.sh:/opt/hcsba/local-db.sh:ro
+    ports:
+      - "127.0.0.1:${OPENMRS_LOCAL_DB_PORT:-13306}:3306"
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=$$(cat /run/secrets/openmrs_local_db_password) mysqladmin ping -h 127.0.0.1 -u$${MYSQL_USER} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    labels:
+      hcsba.environment: local-isolated
+      hcsba.data-origin: snapshot
+    restart: unless-stopped
+
+  openmrs-local:
+    image: ${OPENMRS_LOCAL_IMAGE:?}
+    profiles: ["local-openmrs"]
+    command: ["/bin/bash", "/opt/hcsba/openmrs-local-entrypoint.sh"]
+    environment:
+      TZ: ${TZ:-America/Santiago}
+      OMRS_DB_NAME: ${OPENMRS_LOCAL_DB_NAME:-openmrs}
+      OMRS_DB_HOSTNAME: openmrs-local-db
+      OMRS_DB_USERNAME: ${OPENMRS_LOCAL_DB_USER:-openmrs-local}
+      OMRS_CREATE_TABLES: "false"
+      OMRS_AUTO_UPDATE_DATABASE: "true"
+      OMRS_MODULE_WEB_ADMIN: "true"
+      OMRS_JAVA_SERVER_OPTS: ${OMRS_JAVA_SERVER_OPTS:-}
+      OMRS_JAVA_MEMORY_OPTS: ${OMRS_JAVA_MEMORY_OPTS:-}
+      OMRS_DOCKER_ENV: "true"
+      OMRS_C3P0_MAX_SIZE: ${OMRS_C3P0_MAX_SIZE:-50}
+      OMRS_DB_EXTRA_ARGS: ${OMRS_DB_EXTRA_ARGS:-&zeroDateTimeBehavior=convertToNull}
+      OPENELIS_HOST: disabled.invalid
+      OPENELIS_PORT: "443"
+      OPENELIS_ATOMFEED_USER: disabled
+      OPENELIS_ATOMFEED_PASSWORD: disabled
+      SEND_MAIL: "false"
+      MAIL_TRANSPORT_PROTOCOL: smtp
+      MAIL_SMTP_HOST: disabled.invalid
+      MAIL_SMTP_PORT: "25"
+      MAIL_SMTP_AUTH: "false"
+      MAIL_SMTP_STARTTLS_ENABLE: "false"
+      MAIL_SMTP_SSL_ENABLE: "false"
+      MAIL_DEBUG: "false"
+      MAIL_FROM: no-reply@localhost
+      MAIL_USER: ""
+      MAIL_PASSWORD: ""
+      KEYCLOAK_PUBLIC_URL: ${KEYCLOAK_PUBLIC_URL:?}
+      KEYCLOAK_INTERNAL_URL: ${KEYCLOAK_INTERNAL_URL:-http://keycloak:8080}
+    secrets:
+      - openmrs_local_db_password
+      - source: openmrs_oidc_client_secret_local
+        target: openmrs_oidc_client_secret
+    volumes:
+      - ${CONFIG_VOLUME:?}:/etc/bahmni_config:ro
+      - ./openmrs-local/empty-configuration:/etc/bahmni_config/masterdata/configuration:ro
+      - openmrs-local-data:/openmrs/data
+      - openmrs-local-lab-results:/home/bahmni/uploaded_results
+      - openmrs-local-uploaded-files:/home/bahmni/uploaded-files
+      - openmrs-local-patient-images:/home/bahmni/patient_images
+      - openmrs-local-document-images:/home/bahmni/document_images
+      - ./clinical_forms:/home/bahmni/clinical_forms
+      - openmrs-local-configuration-checksums:/openmrs/data/configuration_checksums
+      - openmrs-local-sms-token:/openmrs/data/sms-token
+      - ./openmrs-local/openmrs-local-entrypoint.sh:/opt/hcsba/openmrs-local-entrypoint.sh:ro
+      - ./openmrs-local/oauth2.properties:/openmrs/data/oauth2.properties:ro
+      - ./openmrs-local/state:/opt/hcsba/state:ro
+      - ${HCSBA_OAUTH2_OMOD_PATH:?}:/openmrs/data/modules/oauth2login-1.5.0.omod:ro
+      - ${HCSBA_IPD_OMOD_PATH:?}:/openmrs/data/modules/bahmni-ipd-1.1.1.omod:ro
+    expose: ["8080"]
+    depends_on:
+      openmrs-local-db:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl --max-time 4 -fsS http://127.0.0.1:8080/openmrs/ws/rest/v1/session >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 40
+      start_period: 180s
+    labels:
+      hcsba.environment: local-isolated
+      hcsba.data-origin: snapshot
+    restart: unless-stopped
+
+secrets:
+  openmrs_local_db_password:
+    file: ./openmrs-local/secrets/openmrs-local-db-password
+  openmrs_local_db_root_password:
+    file: ./openmrs-local/secrets/openmrs-local-db-root-password
+  openmrs_oidc_client_secret_local:
+    file: ./keycloak/secrets/openmrs-client-secret
+
+volumes:
+  openmrs-local-db-data:
+  openmrs-local-data:
+  openmrs-local-lab-results:
+  openmrs-local-uploaded-files:
+  openmrs-local-patient-images:
+  openmrs-local-document-images:
+  openmrs-local-configuration-checksums:
+  openmrs-local-sms-token:

@@ -1,0 +1,276 @@
+{
+  "realm": "hcsba",
+  "displayName": "HCSBA",
+  "loginTheme": "hcsba",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "registrationEmailAsUsername": false,
+  "rememberMe": false,
+  "verifyEmail": false,
+  "loginWithEmailAllowed": false,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": false,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "waitIncrementSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
+  "maxDeltaTimeSeconds": 43200,
+  "failureFactor": 5,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 28800,
+  "offlineSessionIdleTimeout": 2592000,
+  "accessTokenLifespan": 300,
+  "accessCodeLifespan": 60,
+  "accessCodeLifespanUserAction": 300,
+  "accessCodeLifespanLogin": 1800,
+  "internationalizationEnabled": true,
+  "supportedLocales": ["es"],
+  "defaultLocale": "es",
+  "otpPolicyType": "totp",
+  "otpPolicyAlgorithm": "HmacSHA1",
+  "otpPolicyInitialCounter": 0,
+  "otpPolicyDigits": 6,
+  "otpPolicyLookAheadWindow": 1,
+  "otpPolicyPeriod": 30,
+  "otpPolicyCodeReusable": false,
+  "eventsEnabled": true,
+  "eventsExpiration": 2592000,
+  "enabledEventTypes": [
+    "LOGIN", "LOGIN_ERROR", "LOGOUT", "LOGOUT_ERROR", "CODE_TO_TOKEN", "CODE_TO_TOKEN_ERROR",
+    "CLIENT_LOGIN", "CLIENT_LOGIN_ERROR", "UPDATE_TOTP", "UPDATE_TOTP_ERROR",
+    "REMOVE_TOTP", "REMOVE_TOTP_ERROR", "UPDATE_PASSWORD", "UPDATE_PASSWORD_ERROR"
+  ],
+  "adminEventsEnabled": true,
+  "adminEventsDetailsEnabled": false,
+  "requiredActions": [
+    {
+      "alias": "CONFIGURE_TOTP",
+      "name": "Configure OTP",
+      "providerId": "CONFIGURE_TOTP",
+      "enabled": true,
+      "defaultAction": true,
+      "priority": 10,
+      "config": {"add-recovery-codes": "true"}
+    },
+    {
+      "alias": "CONFIGURE_RECOVERY_AUTHN_CODES",
+      "name": "Generate Recovery Codes",
+      "providerId": "CONFIGURE_RECOVERY_AUTHN_CODES",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 15,
+      "config": {"warningThreshold": "4"}
+    },
+    {
+      "alias": "UPDATE_PASSWORD",
+      "name": "Update Password",
+      "providerId": "UPDATE_PASSWORD",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 30,
+      "config": {}
+    },
+    {
+      "alias": "VERIFY_EMAIL",
+      "name": "Verify Email",
+      "providerId": "VERIFY_EMAIL",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 50,
+      "config": {}
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "openmrs",
+      "name": "OpenMRS / Bahmni",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${OPENMRS_OIDC_CLIENT_SECRET}",
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "bearerOnly": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "frontchannelLogout": false,
+      "rootUrl": "${BAHMNI_PUBLIC_URL}",
+      "baseUrl": "${BAHMNI_PUBLIC_URL}/bahmni/",
+      "redirectUris": [
+        "${BAHMNI_PUBLIC_URL}/openmrs/oauth2login",
+        "${BAHMNI_LOCAL_DEV_URL}/openmrs/oauth2login"
+      ],
+      "webOrigins": ["${BAHMNI_PUBLIC_URL}", "${BAHMNI_LOCAL_DEV_URL}"],
+      "attributes": {
+        "post.logout.redirect.uris": "${BAHMNI_PUBLIC_URL}/bahmni/login?loggedOut=1##${BAHMNI_LOCAL_DEV_URL}/bahmni/login?loggedOut=1",
+        "backchannel.logout.url": "${BAHMNI_PUBLIC_URL}/openmrs/oauth2backchannellogout",
+        "backchannel.logout.session.required": "true",
+        "backchannel.logout.revoke.offline.tokens": "true"
+      },
+      "defaultClientScopes": ["web-origins", "acr", "roles", "profile", "email"],
+      "optionalClientScopes": [],
+      "protocolMappers": [
+        {
+          "name": "OpenMRS roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-client-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "usermodel.clientRoleMapping.clientId": "openmrs",
+            "multivalued": "true",
+            "claim.name": "openmrs_roles",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "OpenMRS provider",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "openmrs_provider",
+            "claim.name": "openmrs_provider",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "OpenMRS system ID",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "openmrs_system_id",
+            "claim.name": "openmrs_system_id",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "OpenMRS audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "openmrs",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "openelis",
+      "name": "OpenELIS technical account",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${OPENELIS_OIDC_CLIENT_SECRET}",
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "bearerOnly": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "protocolMappers": [{
+        "name": "OpenMRS audience",
+        "protocol": "openid-connect",
+        "protocolMapper": "oidc-audience-mapper",
+        "config": {"included.client.audience": "openmrs", "access.token.claim": "true", "introspection.token.claim": "true"}
+      }]
+    },
+    {
+      "clientId": "odoo-connect",
+      "name": "Odoo connector technical account",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${ODOO_CONNECT_OIDC_CLIENT_SECRET}",
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "bearerOnly": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "protocolMappers": [{
+        "name": "OpenMRS audience",
+        "protocol": "openid-connect",
+        "protocolMapper": "oidc-audience-mapper",
+        "config": {"included.client.audience": "openmrs", "access.token.claim": "true", "introspection.token.claim": "true"}
+      }]
+    },
+    {
+      "clientId": "odoo10-connect",
+      "name": "Odoo 10 connector technical account",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${ODOO10_CONNECT_OIDC_CLIENT_SECRET}",
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "bearerOnly": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "protocolMappers": [{
+        "name": "OpenMRS audience",
+        "protocol": "openid-connect",
+        "protocolMapper": "oidc-audience-mapper",
+        "config": {"included.client.audience": "openmrs", "access.token.claim": "true", "introspection.token.claim": "true"}
+      }]
+    },
+    {
+      "clientId": "reports",
+      "name": "Bahmni Reports technical account",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${REPORTS_OIDC_CLIENT_SECRET}",
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "bearerOnly": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "protocolMappers": [{
+        "name": "OpenMRS audience",
+        "protocol": "openid-connect",
+        "protocolMapper": "oidc-audience-mapper",
+        "config": {"included.client.audience": "openmrs", "access.token.claim": "true", "introspection.token.claim": "true"}
+      }]
+    },
+    {
+      "clientId": "sms-service",
+      "name": "Bahmni SMS technical account",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${SMS_SERVICE_OIDC_CLIENT_SECRET}",
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "bearerOnly": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "protocolMappers": [{
+        "name": "OpenMRS audience",
+        "protocol": "openid-connect",
+        "protocolMapper": "oidc-audience-mapper",
+        "config": {"included.client.audience": "openmrs", "access.token.claim": "true", "introspection.token.claim": "true"}
+      }]
+    }
+  ]
+}

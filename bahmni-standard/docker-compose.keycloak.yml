@@ -1,0 +1,237 @@
+x-token-bridge: &token-bridge
+  build:
+    context: ./keycloak/token-bridge
+    dockerfile: Containerfile
+  profiles: ["sso"]
+  expose: ["8080"]
+  environment: &token-bridge-environment
+    OIDC_TOKEN_URL: http://keycloak:8080/realms/hcsba/protocol/openid-connect/token
+    OIDC_CLIENT_SECRET_FILE: /run/secrets/oidc_client_secret
+    UPSTREAM_SCHEME: https
+    UPSTREAM_HOST: ${OPENMRS_UPSTREAM_HOST:?}
+    UPSTREAM_PORT: ${OPENMRS_UPSTREAM_PORT:-443}
+    UPSTREAM_TLS_VERIFY: ${OPENMRS_UPSTREAM_TLS_VERIFY:-true}
+    HTTP_TIMEOUT_SECONDS: "120"
+  depends_on:
+    keycloak-configurator:
+      condition: service_completed_successfully
+  healthcheck:
+    test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2)"]
+    interval: 15s
+    timeout: 4s
+    retries: 5
+  restart: ${RESTART_POLICY:-unless-stopped}
+
+services:
+  proxy:
+    environment:
+      KEYCLOAK_PUBLIC_HOST: ${KEYCLOAK_PUBLIC_HOST:?}
+      KEYCLOAK_ADMIN_CIDR: ${KEYCLOAK_ADMIN_CIDR:-10.68.174.0/24}
+      KEYCLOAK_ADMIN_PROXY_CIDR: ${KEYCLOAK_ADMIN_PROXY_CIDR:-172.16.0.0/12}
+    volumes:
+      - ./keycloak/apache-keycloak.conf:/usr/local/apache2/conf/extra/hcsba-keycloak.conf:ro
+      - ${KEYCLOAK_TLS_CERTIFICATE_PATH:?}:/etc/tls/cert.pem:ro
+      - ${KEYCLOAK_TLS_KEY_PATH:?}:/etc/tls/key.pem:ro
+      - ${KEYCLOAK_TLS_CERTIFICATE_PATH:?}:/etc/tls/keycloak/cert.pem:ro
+      - ${KEYCLOAK_TLS_KEY_PATH:?}:/etc/tls/keycloak/key.pem:ro
+    depends_on:
+      keycloak:
+        condition: service_healthy
+
+  bahmni-next-web:
+    environment:
+      NEXT_PUBLIC_AUTH_MODE: ${AUTH_MODE:-openmrs}
+
+  keycloak-db:
+    image: postgres:17.10-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
+    profiles: ["sso"]
+    environment:
+      POSTGRES_DB: ${KEYCLOAK_DB_NAME:-keycloak}
+      POSTGRES_USER: ${KEYCLOAK_DB_USER:-keycloak}
+      POSTGRES_PASSWORD_FILE: /run/secrets/keycloak_db_password
+    secrets:
+      - keycloak_db_password
+    volumes:
+      - keycloak-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: ${RESTART_POLICY:-unless-stopped}
+
+  keycloak:
+    build:
+      context: ./keycloak
+      dockerfile: Containerfile
+    image: hcsba/keycloak:26.7.0-2
+    profiles: ["sso"]
+    expose: ["8080", "9000"]
+    ports:
+      - "127.0.0.1:${KEYCLOAK_LOOPBACK_PORT:-18080}:8080"
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/${KEYCLOAK_DB_NAME:-keycloak}
+      KC_DB_USERNAME: ${KEYCLOAK_DB_USER:-keycloak}
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME: ${KEYCLOAK_PUBLIC_URL:?}
+      KC_HOSTNAME_ADMIN: ${KEYCLOAK_PUBLIC_URL:?}
+      KC_PROXY_HEADERS: xforwarded
+      KC_PROXY_TRUSTED_ADDRESSES: 172.16.0.0/12
+      KC_CACHE: local
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_BOOTSTRAP_ADMIN:-kc-bootstrap-admin}
+      BAHMNI_PUBLIC_URL: ${BAHMNI_PUBLIC_URL:?}
+      BAHMNI_LOCAL_DEV_URL: ${BAHMNI_LOCAL_DEV_URL:-https://localhost}
+      OPENMRS_BACKCHANNEL_LOGOUT_URL: ${OPENMRS_BACKCHANNEL_LOGOUT_URL:-}
+    secrets:
+      - keycloak_db_password
+      - keycloak_admin_password
+      - openmrs_oidc_client_secret
+      - openelis_oidc_client_secret
+      - odoo_connect_oidc_client_secret
+      - odoo10_connect_oidc_client_secret
+      - reports_oidc_client_secret
+      - sms_service_oidc_client_secret
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000; printf 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3; grep -q '200 OK' <&3"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 45s
+    restart: ${RESTART_POLICY:-unless-stopped}
+
+  keycloak-configurator:
+    image: hcsba/keycloak:26.7.0-2
+    profiles: ["sso"]
+    entrypoint: ["/bin/bash", "/opt/hcsba/configure-keycloak.sh"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_BOOTSTRAP_ADMIN:-kc-bootstrap-admin}
+      BAHMNI_PUBLIC_URL: ${BAHMNI_PUBLIC_URL:?}
+      BAHMNI_LOCAL_DEV_URL: ${BAHMNI_LOCAL_DEV_URL:-https://localhost}
+      OPENMRS_BACKCHANNEL_LOGOUT_URL: ${OPENMRS_BACKCHANNEL_LOGOUT_URL:-}
+    volumes:
+      - ./keycloak/configure-keycloak.sh:/opt/hcsba/configure-keycloak.sh:ro
+      - ./keycloak/user-profile-hcsba.json:/opt/hcsba/user-profile-hcsba.json:ro
+    secrets:
+      - keycloak_admin_password
+      - openmrs_oidc_client_secret
+      - openelis_oidc_client_secret
+      - odoo_connect_oidc_client_secret
+      - odoo10_connect_oidc_client_secret
+      - reports_oidc_client_secret
+      - sms_service_oidc_client_secret
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    restart: "no"
+
+  openmrs-token-bridge-openelis:
+    <<: *token-bridge
+    environment:
+      <<: *token-bridge-environment
+      OIDC_CLIENT_ID: openelis
+    secrets:
+      - source: openelis_oidc_client_secret
+        target: oidc_client_secret
+
+  openmrs-token-bridge-odoo:
+    <<: *token-bridge
+    environment:
+      <<: *token-bridge-environment
+      OIDC_CLIENT_ID: odoo-connect
+    secrets:
+      - source: odoo_connect_oidc_client_secret
+        target: oidc_client_secret
+
+  openmrs-token-bridge-odoo10:
+    <<: *token-bridge
+    environment:
+      <<: *token-bridge-environment
+      OIDC_CLIENT_ID: odoo10-connect
+    secrets:
+      - source: odoo10_connect_oidc_client_secret
+        target: oidc_client_secret
+
+  openmrs-token-bridge-reports:
+    <<: *token-bridge
+    environment:
+      <<: *token-bridge-environment
+      OIDC_CLIENT_ID: reports
+    secrets:
+      - source: reports_oidc_client_secret
+        target: oidc_client_secret
+
+  openmrs-token-bridge-sms:
+    <<: *token-bridge
+    environment:
+      <<: *token-bridge-environment
+      OIDC_CLIENT_ID: sms-service
+    secrets:
+      - source: sms_service_oidc_client_secret
+        target: oidc_client_secret
+
+  openelis:
+    environment:
+      OPENMRS_HOST: openmrs-token-bridge-openelis
+      OPENMRS_PORT: "8080"
+    depends_on:
+      openmrs-token-bridge-openelis:
+        condition: service_healthy
+
+  odoo-connect:
+    environment:
+      OPENMRS_HOST: openmrs-token-bridge-odoo
+      OPENMRS_PORT: "8080"
+    depends_on:
+      openmrs-token-bridge-odoo:
+        condition: service_healthy
+
+  odoo-10-connect:
+    environment:
+      OPENMRS_HOST: openmrs-token-bridge-odoo10
+      OPENMRS_PORT: "8080"
+    depends_on:
+      openmrs-token-bridge-odoo10:
+        condition: service_healthy
+
+  reports:
+    environment:
+      OPENMRS_HOST: openmrs-token-bridge-reports
+      OPENMRS_PORT: "8080"
+    depends_on:
+      openmrs-token-bridge-reports:
+        condition: service_healthy
+
+  sms-service:
+    environment:
+      SMS_OPENMRS_HOST: openmrs-token-bridge-sms
+      SMS_OPENMRS_PORT: "8080"
+    depends_on:
+      openmrs-token-bridge-sms:
+        condition: service_healthy
+
+secrets:
+  keycloak_db_password:
+    file: ./keycloak/secrets/keycloak-db-password
+  keycloak_admin_password:
+    file: ./keycloak/secrets/keycloak-admin-password
+  openmrs_oidc_client_secret:
+    file: ./keycloak/secrets/openmrs-client-secret
+  openelis_oidc_client_secret:
+    file: ./keycloak/secrets/openelis-client-secret
+  odoo_connect_oidc_client_secret:
+    file: ./keycloak/secrets/odoo-connect-client-secret
+  odoo10_connect_oidc_client_secret:
+    file: ./keycloak/secrets/odoo10-connect-client-secret
+  reports_oidc_client_secret:
+    file: ./keycloak/secrets/reports-client-secret
+  sms_service_oidc_client_secret:
+    file: ./keycloak/secrets/sms-service-client-secret
+
+volumes:
+  keycloak-db-data:

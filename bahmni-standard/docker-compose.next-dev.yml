@@ -1,0 +1,43 @@
+services:
+  proxy:
+    command: /bin/sh -c 'exec httpd-foreground $${NEXT_PROXY_DEFINES}'
+    environment:
+      NEXT_PROXY_DEFINES: ${NEXT_PROXY_DEFINES:--D NEXT_SHELL -D NEXT_REGISTRATION -D NEXT_CLINICAL}
+    volumes:
+      - ./bahmni-proxy.conf:/usr/local/apache2/conf/bahmni-proxy.conf:ro
+
+  bahmni-web:
+    volumes:
+      - "${BAHMNI_APPS_PATH:?}/ui/app/:/usr/local/apache2/htdocs/bahmni"
+      - "${BAHMNI_APPS_PATH:?}/ui/node_modules/@bower_components/:/usr/local/apache2/htdocs/bahmni/components"
+
+  bahmni-next-web:
+    image: node:24-alpine
+    working_dir: /workspace
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        current_hash="$$(sha256sum package-lock.json | cut -d ' ' -f 1)"
+        stored_hash="$$(cat node_modules/.package-lock.sha256 2>/dev/null || true)"
+        if [ "$$current_hash" != "$$stored_hash" ] || [ ! -x node_modules/.bin/next ]; then
+          npm ci
+          printf '%s' "$$current_hash" > node_modules/.package-lock.sha256
+        fi
+        # Turbopack does not reliably observe Windows bind mounts through
+        # Docker Desktop. Webpack + Watchpack polling preserves Fast Refresh.
+        exec npm run dev -- --hostname 0.0.0.0 --webpack
+    environment:
+      NODE_ENV: development
+      NEXT_TELEMETRY_DISABLED: "1"
+      WATCHPACK_POLLING: "true"
+      WATCHPACK_POLLING_INTERVAL: "500"
+    volumes:
+      - ../../bahmni-nextjs-hcsba:/workspace
+      - bahmni-next-dev-node-modules:/workspace/node_modules
+      - bahmni-next-dev-cache:/workspace/.next
+
+volumes:
+  bahmni-next-dev-node-modules:
+  bahmni-next-dev-cache:
