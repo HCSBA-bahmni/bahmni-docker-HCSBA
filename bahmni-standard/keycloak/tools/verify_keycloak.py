@@ -66,6 +66,30 @@ def main() -> None:
     require(realm.get("bruteForceProtected") is True, "Brute-force protection must be enabled")
     require(realm.get("otpPolicyCodeReusable") is False, "OTP reuse must be disabled")
     require(realm.get("loginTheme") == "hcsba", "The HCSBA login theme is not active")
+    require(
+        realm.get("passwordPolicy")
+        == "hashAlgorithm(argon2) and length(12) and notUsername and notEmail and passwordHistory(5)",
+        "Password policy is incomplete",
+    )
+    require(realm.get("webAuthnPolicyRpEntityName") == "HCSBA", "WebAuthn RP name is invalid")
+    require(bool(realm.get("webAuthnPolicyRpId")), "WebAuthn RP ID is missing")
+    require(
+        {"ES256", "RS256"}.issubset(realm.get("webAuthnPolicySignatureAlgorithms") or []),
+        "WebAuthn algorithms do not cover security keys and Windows Hello",
+    )
+    require(realm.get("webAuthnPolicyAvoidSameAuthenticatorRegister") is True, "Duplicate WebAuthn credentials are allowed")
+    require(
+        realm.get("webAuthnPolicyPasswordlessUserVerificationRequirement") == "required",
+        "Passwordless credentials do not require user verification",
+    )
+    require(
+        realm.get("webAuthnPolicyPasswordlessRequireResidentKey") == "Yes",
+        "Passwordless credentials are not discoverable",
+    )
+    require(
+        realm.get("webAuthnPolicyPasswordlessPasskeysEnabled") is True,
+        "Passkeys are not enabled in the login form",
+    )
 
     clients, _ = admin.request("GET", "/clients?max=1000")
     by_id = {client["clientId"]: client for client in clients}
@@ -108,10 +132,17 @@ def main() -> None:
     configure_otp = next(action for action in required_actions if action.get("alias") == "CONFIGURE_TOTP")
     require(configure_otp.get("enabled") is True and configure_otp.get("defaultAction") is True, "TOTP is not mandatory")
     require(configure_otp.get("config", {}).get("add-recovery-codes") == "true", "Recovery codes are not generated with TOTP")
+    actions_by_alias = {action.get("alias"): action for action in required_actions}
+    for alias in {"webauthn-register", "webauthn-register-passwordless"}:
+        action = actions_by_alias.get(alias, {})
+        require(action.get("enabled") is True, f"Required action {alias} is disabled")
+        require(action.get("defaultAction") is False, f"Required action {alias} would lock all users into enrollment")
 
     executions, _ = admin.request("GET", "/authentication/flows/browser/executions")
     recovery = next(item for item in executions if item.get("displayName") == "Recovery Authentication Code Form")
     require(recovery.get("requirement") == "ALTERNATIVE", "Recovery codes are not enabled as an OTP alternative")
+    webauthn = next(item for item in executions if item.get("displayName") == "WebAuthn Authenticator")
+    require(webauthn.get("requirement") == "ALTERNATIVE", "WebAuthn is not enabled as a 2FA alternative")
     print(json.dumps({"realm": "hcsba", "issuer": args.expected_issuer, "status": "verified"}))
 
 

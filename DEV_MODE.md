@@ -44,7 +44,7 @@ cd bahmni-docker-HCSBA
 3. Crea `bahmni-nextjs-hcsba/.env.local` desde `.example-env`.
 4. Instala las dependencias de la aplicacion legacy con Node 10 si faltan.
 
-El primer inicio ejecuta `npm ci` dentro del volumen Docker de Next.js. Luego la aplicacion queda disponible en `https://localhost/bahmni`.
+El primer inicio ejecuta `npm ci` dentro del volumen Docker de Next.js. Luego la aplicacion queda disponible directamente en `https://localhost`: el proxy envia la raiz a `/bahmni/home/` y Next.js inicia Keycloak si no existe una sesion OpenMRS valida.
 
 ## Trabajo diario
 
@@ -87,7 +87,7 @@ El OMOD construido desde `openmrs-module-ipd` requiere build y despliegue contro
 
 Las variables del navegador estan documentadas en `bahmni-nextjs-hcsba/.example-env`. Solo contienen rutas same-origin y flags publicos. Credenciales de base de datos, correo u otros servicios pertenecen a `bahmni-standard/.env` y nunca deben agregarse como `NEXT_PUBLIC_*`.
 
-La sesion se inicia normalmente desde `https://localhost/bahmni/login`; el proxy conserva las cookies de OpenMRS para todas las rutas Next y legacy.
+La entrada canonica es `https://localhost`. El proxy la dirige a `/bahmni/home/`; si no hay sesion, Next.js pasa por `/bahmni/login` e inicia el flujo configurado (`openmrs` o `keycloak`). El proxy conserva las cookies de OpenMRS para todas las rutas Next y legacy.
 
 ## Perfil SSO opcional
 
@@ -95,9 +95,37 @@ Keycloak está desactivado por defecto y `AUTH_MODE=openmrs` conserva el login/O
 
 La consola web de administración debe abrirse mediante el mismo hostname TLS del SSO en `https://sso-dev.hcsba.local/admin/master/console/`; el puerto loopback `18080` queda reservado para automatizaciones porque no coincide con el hostname canónico generado por Keycloak.
 
+### Selección explícita del modo de autenticación
+
+Los modos se seleccionan por el archivo de entorno y los overlays Compose que se levantan; no se deben mezclar:
+
+| Modo | Backend OpenMRS | Autenticación | Entrada y uso |
+| --- | --- | --- | --- |
+| Desarrollo liviano diario | Compartido `.205` | Login/OTP OpenMRS | `bahmni-standard/.env` mantiene `AUTH_MODE=openmrs`; usar `.\dev-environment.ps1 up`. Keycloak, PostgreSQL y el clon OpenMRS local permanecen apagados. |
+| Laboratorio SSO aislado | Clon y base local | Keycloak | `bahmni-standard/.env.openmrs-local` mantiene `AUTH_MODE=keycloak`; usar `.\local-openmrs.ps1 up` y `.\local-openmrs.ps1 verify`. |
+| Despliegue SSO controlado | OpenMRS del ambiente destino | Keycloak | Configurar `AUTH_MODE=keycloak` y hostnames en `.env.keycloak`, desplegar el OMOD OAuth2 y sus propiedades en ese OpenMRS y ejecutar `.\sso.ps1 integrate` siguiendo `KEYCLOAK_SSO.md`. |
+
+Para salir del laboratorio local y recuperar el modo liviano sin perder bases, usuarios, realm ni snapshots:
+
+```powershell
+.\local-openmrs.ps1 remote
+.\local-openmrs.ps1 down
+.\sso.ps1 down
+.\dev-environment.ps1 verify
+```
+
+`remote` restaura el proxy y Next.js con el archivo base (`AUTH_MODE=openmrs`) apuntando a `.205`. Los dos comandos `down` eliminan solamente los contenedores opcionales; no usan `-v` y conservan todos sus volúmenes. Para reactivar el laboratorio SSO basta con:
+
+```powershell
+.\local-openmrs.ps1 up
+.\local-openmrs.ps1 verify
+```
+
+Cambiar sólo `AUTH_MODE` modifica el flujo visible de Next.js, pero no instala ni retira el OMOD OAuth2 de OpenMRS. Por eso una promoción o reversa productiva debe seguir siempre las compuertas de `KEYCLOAK_SSO.md`; el script del laboratorio local no se utiliza como mecanismo de despliegue productivo.
+
 ## Comprobacion manual minima
 
-1. Abrir `https://localhost/bahmni` y aceptar el certificado local si el navegador lo solicita.
+1. Abrir `https://localhost` y aceptar el certificado local si el navegador lo solicita. Sin una sesion activa debe comenzar el login configurado.
 2. Iniciar sesion y entrar a Clinico y Camas.
 3. Editar un texto o estilo en `bahmni-nextjs-hcsba/src`; la pagina debe actualizarse sin reconstruir imagen ni pulsar F5.
 4. Confirmar que `https://localhost/openmrs/ws/rest/v1/session` responde y que las configuraciones se leen desde `/bahmni_config`.

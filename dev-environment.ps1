@@ -166,9 +166,19 @@ function Assert-Http200 {
     Write-Host "OK  $Url" -ForegroundColor Green
 }
 
+function Assert-RootEntryRedirect {
+    $response = (& curl.exe -k -s -D - -o NUL "https://localhost/") -join "`n"
+    if ($response -notmatch '(?m)^HTTP/\S+ 302\b' -or
+        $response -notmatch '(?mi)^Location:\s*(?:https://localhost)?/bahmni/home/\s*$') {
+        throw "https://localhost/ no redirigio a /bahmni/home/."
+    }
+    Write-Host "OK  https://localhost/ -> /bahmni/home/" -ForegroundColor Green
+}
+
 function Test-Integration {
     Assert-Command "curl.exe"
     Wait-NextHealth
+    Assert-RootEntryRedirect
     Assert-Http200 "https://localhost/bahmni/api/health"
     Assert-Http200 "https://localhost/bahmni/bedmanagement"
     Assert-Http200 "https://localhost/bahmni_config/openmrs/apps/home/app.json"

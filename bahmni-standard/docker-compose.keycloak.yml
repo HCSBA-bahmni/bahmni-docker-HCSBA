@@ -64,7 +64,7 @@ services:
     build:
       context: ./keycloak
       dockerfile: Containerfile
-    image: hcsba/keycloak:26.7.0-2
+    image: hcsba/keycloak:26.7.0-3
     profiles: ["sso"]
     expose: ["8080", "9000"]
     ports:
@@ -82,6 +82,7 @@ services:
       KC_HEALTH_ENABLED: "true"
       KC_METRICS_ENABLED: "true"
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_BOOTSTRAP_ADMIN:-kc-bootstrap-admin}
+      KEYCLOAK_PUBLIC_HOST: ${KEYCLOAK_PUBLIC_HOST:?}
       BAHMNI_PUBLIC_URL: ${BAHMNI_PUBLIC_URL:?}
       BAHMNI_LOCAL_DEV_URL: ${BAHMNI_LOCAL_DEV_URL:-https://localhost}
       OPENMRS_BACKCHANNEL_LOGOUT_URL: ${OPENMRS_BACKCHANNEL_LOGOUT_URL:-}
@@ -106,11 +107,12 @@ services:
     restart: ${RESTART_POLICY:-unless-stopped}
 
   keycloak-configurator:
-    image: hcsba/keycloak:26.7.0-2
+    image: hcsba/keycloak:26.7.0-3
     profiles: ["sso"]
     entrypoint: ["/bin/bash", "/opt/hcsba/configure-keycloak.sh"]
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_BOOTSTRAP_ADMIN:-kc-bootstrap-admin}
+      KEYCLOAK_PUBLIC_HOST: ${KEYCLOAK_PUBLIC_HOST:?}
       BAHMNI_PUBLIC_URL: ${BAHMNI_PUBLIC_URL:?}
       BAHMNI_LOCAL_DEV_URL: ${BAHMNI_LOCAL_DEV_URL:-https://localhost}
       OPENMRS_BACKCHANNEL_LOGOUT_URL: ${OPENMRS_BACKCHANNEL_LOGOUT_URL:-}

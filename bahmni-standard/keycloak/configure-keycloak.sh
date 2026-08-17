@@ -11,7 +11,48 @@ ADMIN_PASSWORD="$(</run/secrets/keycloak_admin_password)"
 # username editing remains admin-only; keep Keycloak's length and IDN-homograph validators,
 # but remove only the incompatible prohibited-character validator.
 "$KCADM" update users/profile -r hcsba -f /opt/hcsba/user-profile-hcsba.json >/dev/null
-"$KCADM" update realms/hcsba -s loginTheme=hcsba >/dev/null
+PASSWORD_POLICY="hashAlgorithm(argon2) and length(12) and notUsername and notEmail and passwordHistory(5)"
+"$KCADM" update realms/hcsba \
+  -s loginTheme=hcsba \
+  -s "passwordPolicy=$PASSWORD_POLICY" \
+  -s webAuthnPolicyRpEntityName=HCSBA \
+  -s "webAuthnPolicyRpId=$KEYCLOAK_PUBLIC_HOST" \
+  -s 'webAuthnPolicySignatureAlgorithms=["ES256","RS256"]' \
+  -s 'webAuthnPolicyAttestationConveyancePreference=none' \
+  -s 'webAuthnPolicyAuthenticatorAttachment=not specified' \
+  -s webAuthnPolicyRequireResidentKey=No \
+  -s webAuthnPolicyUserVerificationRequirement=preferred \
+  -s webAuthnPolicyCreateTimeout=60 \
+  -s webAuthnPolicyAvoidSameAuthenticatorRegister=true \
+  -s webAuthnPolicyPasswordlessRpEntityName=HCSBA \
+  -s "webAuthnPolicyPasswordlessRpId=$KEYCLOAK_PUBLIC_HOST" \
+  -s 'webAuthnPolicyPasswordlessSignatureAlgorithms=["ES256","RS256"]' \
+  -s 'webAuthnPolicyPasswordlessAttestationConveyancePreference=none' \
+  -s 'webAuthnPolicyPasswordlessAuthenticatorAttachment=not specified' \
+  -s webAuthnPolicyPasswordlessRequireResidentKey=Yes \
+  -s webAuthnPolicyPasswordlessUserVerificationRequirement=required \
+  -s webAuthnPolicyPasswordlessCreateTimeout=60 \
+  -s webAuthnPolicyPasswordlessAvoidSameAuthenticatorRegister=true \
+  -s webAuthnPolicyPasswordlessPasskeysEnabled=true >/dev/null
+
+ensure_required_action() {
+  local provider_id="$1"
+  local display_name="$2"
+  local priority="$3"
+  if ! "$KCADM" get authentication/required-actions -r hcsba \
+    --fields alias --format csv --noquotes | tr -d '\r' | grep -Fxq "$provider_id"; then
+    "$KCADM" create authentication/register-required-action -r hcsba \
+      -s "providerId=$provider_id" -s "name=$display_name" >/dev/null
+  fi
+  "$KCADM" update "authentication/required-actions/$provider_id" -r hcsba \
+    -s "alias=$provider_id" -s "name=$display_name" -s "providerId=$provider_id" \
+    -s enabled=true -s defaultAction=false -s "priority=$priority" >/dev/null
+}
+
+# Registration is opt-in during DEV. This exposes hardware security keys and
+# passwordless passkeys without locking out users that currently only have TOTP.
+ensure_required_action webauthn-register "Webauthn Register" 20
+ensure_required_action webauthn-register-passwordless "Webauthn Register Passwordless" 25
 
 client_uuid() {
   "$KCADM" get clients -r hcsba -q "clientId=$1" --fields id --format csv --noquotes \
@@ -90,9 +131,12 @@ if ! "$KCADM" get "clients/$OPENMRS_CLIENT_UUID/protocol-mappers/models" -r hcsb
     -s 'config."userinfo.token.claim"=true' >/dev/null
 fi
 
-# Recovery codes must be an alternative to TOTP in the conditional 2FA flow.
+# Recovery codes and WebAuthn security keys are alternatives to TOTP in the
+# conditional 2FA flow. Passwordless passkeys are handled by Keycloak's default
+# username form when webAuthnPolicyPasswordlessPasskeysEnabled is active.
 while IFS=',' read -r execution_id display_name; do
-  if [[ "$display_name" == "Recovery Authentication Code Form" ]]; then
+  if [[ "$display_name" == "Recovery Authentication Code Form" || \
+        "$display_name" == "WebAuthn Authenticator" ]]; then
     # Keycloak 26 updates an execution requirement through the parent flow
     # endpoint; /authentication/executions/{id} is read-only apart from
     # priority/configuration sub-resources.

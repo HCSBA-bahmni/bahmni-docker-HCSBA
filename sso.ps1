@@ -198,6 +198,9 @@ function Test-Sso {
         throw "El login OIDC no esta publicando el tema HCSBA esperado."
     }
     $themePath = $matches[1] -replace '&amp;', '&'
+    if ($loginHtml -notmatch 'id="authenticateWebAuthnButton"') {
+        throw "El login OIDC no esta ofreciendo autenticacion mediante passkey."
+    }
     $themeStatus = (& curl.exe -k -s -o NUL -w "%{http_code}" --resolve "${hostName}:443:127.0.0.1" "https://${hostName}${themePath}").Trim()
     if ($themeStatus -ne "200") { throw "El CSS del tema HCSBA respondio HTTP $themeStatus." }
 

@@ -91,7 +91,13 @@ la imagen `keycloak`, incrementar la versión de caché del CSS en `theme.proper
 
 El cliente humano confidencial `openmrs` usa Authorization Code Flow y sólo permite los redirect URI exactos de DEV/local. Emite `preferred_username`, `given_name`, `family_name`, `email`, `sub`, `openmrs_system_id`, `openmrs_roles` y `openmrs_provider`. La promoción se bloquea ante un rol inexistente, System ID ausente, Provider sin ubicación o diferencia posterior a la sincronización. Las ubicaciones no se copian a Keycloak.
 
-TOTP es acción obligatoria. `Configure OTP` genera además los doce códigos de recuperación y el Browser Flow habilita `Recovery Authentication Code Form` como alternativa. Autorregistro, reutilización de OTP y recuperación de contraseña pública están deshabilitados; fuerza bruta, bloqueo temporal y eventos administrativos están habilitados.
+TOTP es acción obligatoria. `Configure OTP` genera además los doce códigos de recuperación y el Browser Flow habilita `Recovery Authentication Code Form` como alternativa. WebAuthn también está habilitado como alternativa de segundo factor y el formulario de acceso admite passkeys sin contraseña. Las dos acciones de registro (`Webauthn Register` y `Webauthn Register Passwordless`) quedan disponibles, pero no son acciones predeterminadas: durante DEV se asignan de manera controlada por usuario para evitar bloquear cuentas que todavía no tienen una llave compatible.
+
+La política de contraseña usa Argon2, exige al menos 12 caracteres, impide usar el username o correo y conserva un historial de cinco claves. Las llaves WebAuthn aceptan `ES256` y `RS256`, permiten autenticadores físicos o de plataforma, evitan registrar dos veces el mismo autenticador y usan 60 segundos de timeout. Las passkeys requieren verificación local del usuario y una credencial descubrible. El RP ID proviene de `KEYCLOAK_PUBLIC_HOST`: debe fijarse antes del enrolamiento porque una llave registrada para un hostname no funciona en otro.
+
+Para enrolar un usuario en DEV, abrir `Users`, seleccionar la cuenta y usar `Credentials` → `Credential reset`. Elegir `Webauthn Register` para una llave como segundo factor o `Webauthn Register Passwordless` para una passkey. En el siguiente ingreso Keycloak solicitará el registro; TOTP y los códigos de recuperación permanecen como respaldo. No activar `Default Action` para WebAuthn hasta completar el inventario de dispositivos y la prueba de recuperación de todos los perfiles clínicos.
+
+La configuración sigue la guía oficial de [WebAuthn, passkeys y códigos de recuperación](https://www.keycloak.org/docs/latest/server_admin/#_webauthn) y la [política de contraseñas de Keycloak](https://www.keycloak.org/docs/latest/server_admin/#_password-policies).
 
 ## Cuentas técnicas
 
