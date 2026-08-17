@@ -2,7 +2,7 @@ services:
   proxy:
     command: /bin/sh -c 'exec httpd-foreground $${NEXT_PROXY_DEFINES}'
     environment:
-      NEXT_PROXY_DEFINES: ${NEXT_PROXY_DEFINES:--D NEXT_SHELL -D NEXT_REGISTRATION -D NEXT_CLINICAL}
+      NEXT_PROXY_DEFINES: ${NEXT_PROXY_DEFINES:--D NEXT_SHELL -D NEXT_REGISTRATION -D NEXT_CLINICAL -D NEXT_DOCUMENT_UPLOAD -D NEXT_ORDERS}
     volumes:
       - ./bahmni-proxy.conf:/usr/local/apache2/conf/bahmni-proxy.conf:ro
 

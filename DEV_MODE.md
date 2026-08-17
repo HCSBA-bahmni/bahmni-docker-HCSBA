@@ -74,7 +74,7 @@ Para ejecutar Next.js directamente en el host, detenga solo ese servicio, copie 
 
 ## Topologia
 
-- `proxy`: termina HTTPS, enruta las aplicaciones y eleva `/bahmni/_next/webpack-hmr` como WebSocket.
+- `proxy`: termina HTTPS, enruta las aplicaciones y eleva `/bahmni/_next/webpack-hmr` como WebSocket. Los defines `NEXT_DOCUMENT_UPLOAD` y `NEXT_ORDERS` dirigen esos módulos a sus rutas Next.js.
 - `bahmni-next-web`: Node 24 Alpine, codigo montado desde el host y dependencias en volumen nombrado.
 - `bahmni-config`: sirve `standard-config-HCSBA` desde el checkout local.
 - `bahmni-web`: conserva AngularJS para referencia y rutas que aun no han sido cortadas.

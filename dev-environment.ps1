@@ -93,7 +93,7 @@ function Initialize-Workspace {
         PATIENT_DOCUMENTS_TAG = "1.1.1"
         BAHMNI_NEXT_WEB_IMAGE_TAG = "0.1.0-rc.0-ipd-tasks.5"
         CLINICAL_CONSULTATION_ENABLED = "true"
-        NEXT_PROXY_DEFINES = "-D NEXT_SHELL -D NEXT_REGISTRATION -D NEXT_CLINICAL -D NEXT_BEDMANAGEMENT -D NEXT_ADT -D NEXT_APPOINTMENTS"
+        NEXT_PROXY_DEFINES = "-D NEXT_SHELL -D NEXT_REGISTRATION -D NEXT_CLINICAL -D NEXT_BEDMANAGEMENT -D NEXT_ADT -D NEXT_APPOINTMENTS -D NEXT_DOCUMENT_UPLOAD -D NEXT_ORDERS"
         REPORTS_DB_HOST = "reportsdb"
         RESTART_POLICY = "unless-stopped"
     }
@@ -181,6 +181,8 @@ function Test-Integration {
     Assert-RootEntryRedirect
     Assert-Http200 "https://localhost/bahmni/api/health"
     Assert-Http200 "https://localhost/bahmni/bedmanagement"
+    Assert-Http200 "https://localhost/bahmni/document-upload?encounterType=RADIOLOGY&topLevelConcept=All%20Radiology%20orders"
+    Assert-Http200 "https://localhost/bahmni/orders"
     Assert-Http200 "https://localhost/bahmni_config/openmrs/apps/home/app.json"
     Assert-Http200 "https://localhost/openmrs/ws/rest/v1/session"
 
