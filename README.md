@@ -1,5 +1,30 @@
 # Bahmni Docker
 
+## Cutover de Administración a Next
+
+El proxy admite el define opt-in `NEXT_ADMIN_AUDIT_LOG`. Con el define activo,
+`/bahmni/admin` se sirve desde `bahmni-next-web` y
+`/bahmni/admin-legacy` conserva el frontend Angular real. El alias legacy está
+declarado antes de la regla general para evitar captura o loops.
+
+Desde `bahmni-standard`:
+
+```powershell
+$env:NEXT_PROXY_DEFINES='-D NEXT_ADMIN_AUDIT_LOG'
+docker compose up -d --force-recreate proxy
+.\test-admin-cutover.ps1
+```
+
+Rollback independiente, recreando únicamente el proxy:
+
+```powershell
+$env:NEXT_PROXY_DEFINES=''
+docker compose up -d --force-recreate proxy
+```
+
+La variable vacía es el valor seguro por defecto y mantiene Administración
+completamente en legacy.
+
 Refer this [Wiki Page](https://bahmni.atlassian.net/wiki/spaces/BAH/pages/299630726/Running+Bahmni+on+Docker) for Running Bahmni on Docker for detailed instructions.
 
 ## Running Bahmni LITE or STANDARD using docker compose: 

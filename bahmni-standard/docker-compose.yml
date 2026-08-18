@@ -20,7 +20,9 @@ services:
 
   proxy:
     image: 'bahmni/proxy:${PROXY_IMAGE_TAG:?}'
-    #volumes:
+    command: /bin/sh -c 'exec httpd-foreground $${NEXT_PROXY_DEFINES}'
+    volumes:
+      - ./bahmni-proxy.conf:/usr/local/apache2/conf/bahmni-proxy.conf:ro
       # - ${CERTIFICATE_PATH}:/etc/tls
     ports:
       - '80:80'
@@ -29,6 +31,7 @@ services:
     restart: ${RESTART_POLICY}
     environment:
       TZ: ${TZ}
+      NEXT_PROXY_DEFINES: ${NEXT_PROXY_DEFINES:-}
 
   bahmni-config:
     image: 'hcsba/standard-config:${CONFIG_IMAGE_TAG:?}'
@@ -360,6 +363,20 @@ services:
       - "${CONFIG_VOLUME:?}:/usr/local/apache2/htdocs/bahmni_config/:ro"
     #   - "${BAHMNI_APPS_PATH:?}/ui/app/:/usr/local/apache2/htdocs/bahmni"
     #   - "${BAHMNI_APPS_PATH:?}/ui/node_modules/@bower_components/:/usr/local/apache2/htdocs/bahmni/components"
+    logging: *log-config
+    restart: ${RESTART_POLICY}
+
+  bahmni-next-web:
+    image: hcsba/bahmni-next-web:${BAHMNI_NEXT_WEB_IMAGE_TAG:?}
+    profiles: ["emr","bahmni-standard","bahmni-mart"]
+    expose:
+      - "3000"
+    environment:
+      TZ: ${TZ}
+      NEXT_PUBLIC_OPENMRS_BASE: /openmrs
+      NEXT_PUBLIC_CONFIG_BASE: /bahmni_config/openmrs/apps
+      NEXT_PUBLIC_IMPLEMENTATION_CONFIG_BASE: /implementation_config/openmrs/apps
+      NEXT_PUBLIC_DEFAULT_LOCALE: es
     logging: *log-config
     restart: ${RESTART_POLICY}
 
