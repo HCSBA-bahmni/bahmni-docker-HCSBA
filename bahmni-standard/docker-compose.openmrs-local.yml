@@ -89,6 +89,7 @@ services:
         target: openmrs_oidc_client_secret
     volumes:
       - ${CONFIG_VOLUME:?}:/etc/bahmni_config:ro
+      - ${CONFIG_VOLUME:?}/masterdata/configuration:/opt/hcsba/current-configuration:ro
       - ./openmrs-local/empty-configuration:/etc/bahmni_config/masterdata/configuration:ro
       - openmrs-local-data:/openmrs/data
       - openmrs-local-lab-results:/home/bahmni/uploaded_results
@@ -99,6 +100,7 @@ services:
       - openmrs-local-configuration-checksums:/openmrs/data/configuration_checksums
       - openmrs-local-sms-token:/openmrs/data/sms-token
       - ./openmrs-local/openmrs-local-entrypoint.sh:/opt/hcsba/openmrs-local-entrypoint.sh:ro
+      - ./openmrs-local/eis-liquibase.xml:/opt/hcsba/eis-liquibase.xml:ro
       - ./openmrs-local/oauth2.properties:/openmrs/data/oauth2.properties:ro
       - ./openmrs-local/state:/opt/hcsba/state:ro
       - ${HCSBA_OAUTH2_OMOD_PATH:?}:/openmrs/data/modules/oauth2login-1.5.0.omod:ro

@@ -15,12 +15,35 @@ if [[ -z "$OMRS_DB_PASSWORD" || -z "$OPENMRS_OIDC_CLIENT_SECRET" ]]; then
   exit 43
 fi
 
-# The database snapshot already contains the promoted HCSBA metadata. Replaying Initializer/OCL
-# imports would both alter parity and make the first local boot needlessly expensive. This path is
-# generated from the read-only configuration mount and is safe to clear only after the local
-# snapshot marker above has proven that this is the isolated container.
+# Stage only the versioned EIS registration delta on every isolated-local start.
+# The snapshot already contains the broader clinical configuration; replaying all
+# of it can collide with historical concepts. Initializer keeps persistent
+# checksums and applies only new or changed EIS files without touching .205.
 rm -rf /openmrs/data/configuration
-mkdir -p /openmrs/data/configuration
+mkdir -p \
+  /openmrs/data/configuration/addresshierarchy \
+  /openmrs/data/configuration/concepts \
+  /openmrs/data/configuration/conceptsources \
+  /openmrs/data/configuration/globalproperties \
+  /openmrs/data/configuration/idgen \
+  /openmrs/data/configuration/liquibase \
+  /openmrs/data/configuration/personattributetypes \
+  /openmrs/data/configuration/relationshiptypes
+
+configuration_source=/opt/hcsba/current-configuration
+cp "$configuration_source/addresshierarchy/addressConfiguration.xml" /openmrs/data/configuration/addresshierarchy/
+cp "$configuration_source/addresshierarchy/addresshierarchy.csv" /openmrs/data/configuration/addresshierarchy/
+cp "$configuration_source/concepts/eisContact.csv" /openmrs/data/configuration/concepts/
+cp "$configuration_source/concepts/eisDemographics.csv" /openmrs/data/configuration/concepts/
+cp "$configuration_source/concepts/eisHealthInsurers.csv" /openmrs/data/configuration/concepts/
+cp "$configuration_source/conceptsources/sources.csv" /openmrs/data/configuration/conceptsources/
+cp "$configuration_source/globalproperties/gp_eis_registration.xml" /openmrs/data/configuration/globalproperties/
+cp "$configuration_source/idgen/identifierSource.csv" /openmrs/data/configuration/idgen/
+cp "$configuration_source/liquibase/eis_patient_identifiers.xml" /openmrs/data/configuration/liquibase/
+cp "$configuration_source/liquibase/eis_registration_contact_order.xml" /openmrs/data/configuration/liquibase/
+cp /opt/hcsba/eis-liquibase.xml /openmrs/data/configuration/liquibase/liquibase.xml
+cp "$configuration_source/personattributetypes/personAttributeTypes.csv" /openmrs/data/configuration/personattributetypes/
+cp "$configuration_source/relationshiptypes/relationshiptypes.csv" /openmrs/data/configuration/relationshiptypes/
 
 # The upstream image follows the redirect returned by GET / during its bootstrap probe.
 # With oauth2login enabled that redirect targets the public Keycloak hostname, which is not
