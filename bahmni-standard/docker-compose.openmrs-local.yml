@@ -34,6 +34,8 @@ services:
       - ./openmrs-local/snapshots:/snapshot
       - ./openmrs-local/isolate-clone.sql:/opt/hcsba/isolate-clone.sql:ro
       - ./openmrs-local/local-db.sh:/opt/hcsba/local-db.sh:ro
+      - ./openmrs-local/eis-identity-db.sh:/opt/hcsba/eis-identity-db.sh:ro
+      - ${HCSBA_EIS_IDENTITY_DB_PATH:?}:/opt/hcsba/eis-identity-db-source:ro
     ports:
       - "127.0.0.1:${OPENMRS_LOCAL_DB_PORT:-13306}:3306"
     healthcheck:
@@ -101,6 +103,7 @@ services:
       - ./openmrs-local/state:/opt/hcsba/state:ro
       - ${HCSBA_OAUTH2_OMOD_PATH:?}:/openmrs/data/modules/oauth2login-1.5.0.omod:ro
       - ${HCSBA_IPD_OMOD_PATH:?}:/openmrs/data/modules/bahmni-ipd-1.1.1.omod:ro
+      - ${HCSBA_EIS_IDENTITY_OMOD_PATH:?}:/openmrs/data/modules/eisidentity-0.1.1-hcsba.1-SNAPSHOT.omod:ro
     expose: ["8080"]
     depends_on:
       openmrs-local-db:

@@ -12,6 +12,7 @@ case "${1:-}" in
     fi
     mysql -uroot <<SQL
 DROP DATABASE IF EXISTS \`${MYSQL_DATABASE}\`;
+DROP DATABASE IF EXISTS eis_identity;
 CREATE DATABASE \`${MYSQL_DATABASE}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 GRANT ALL PRIVILEGES ON \`${MYSQL_DATABASE}\`.* TO \`${MYSQL_USER}\`@'%';
 FLUSH PRIVILEGES;
@@ -25,9 +26,13 @@ SQL
       echo "Invalid local backup name: $backup_name" >&2
       exit 64
     fi
+    databases=("$MYSQL_DATABASE")
+    if [[ "$(mysql -N -B -uroot -e "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME='eis_identity'")" == "1" ]]; then
+      databases+=("eis_identity")
+    fi
     mysqldump --single-transaction --quick --routines --triggers --events --hex-blob \
       --set-gtid-purged=OFF --no-tablespaces --column-statistics=0 \
-      -uroot "$MYSQL_DATABASE" | gzip -1 > "/snapshot/$backup_name"
+      -uroot --databases "${databases[@]}" | gzip -1 > "/snapshot/$backup_name"
     ;;
   check-isolation)
     mysql -N -uroot "$MYSQL_DATABASE" <<'SQL'

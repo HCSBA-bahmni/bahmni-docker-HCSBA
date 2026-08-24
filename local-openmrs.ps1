@@ -67,7 +67,7 @@ function Initialize-LocalOpenmrs {
     & (Join-Path $repository "sso.ps1") init
 
     $envMap = Get-EnvMap $localEnv
-    foreach ($name in @("HCSBA_OAUTH2_OMOD_PATH", "HCSBA_IPD_OMOD_PATH")) {
+    foreach ($name in @("HCSBA_OAUTH2_OMOD_PATH", "HCSBA_IPD_OMOD_PATH", "HCSBA_EIS_IDENTITY_OMOD_PATH", "HCSBA_EIS_IDENTITY_DB_PATH")) {
         if (-not $envMap.ContainsKey($name)) { throw "Falta $name en $localEnv." }
         $candidate = [System.IO.Path]::GetFullPath((Join-Path $standard $envMap[$name]))
         if (-not (Test-Path -LiteralPath $candidate)) {
@@ -137,6 +137,10 @@ function Wait-LocalDatabase {
     throw "La base local no quedo saludable dentro del tiempo esperado."
 }
 
+function Invoke-EisIdentityDatabase([ValidateSet("migrate", "verify")][string]$Mode) {
+    Invoke-Compose @("exec", "-T", "openmrs-local-db", "bash", "/opt/hcsba/eis-identity-db.sh", $Mode)
+}
+
 function New-DevelopmentCertificate {
     Initialize-LocalOpenmrs
     $key = Join-Path $tlsDirectory "sso-dev-key.pem"
@@ -186,7 +190,7 @@ function New-RemoteSnapshot {
     $env:SOURCE_DB_USER = $source["OPENMRS_DB_USERNAME"]
     $env:SOURCE_DB_PASSWORD = $source["OPENMRS_DB_PASSWORD"]
     try {
-        $dumpCommand = 'set -euo pipefail; MYSQL_PWD="$SOURCE_DB_PASSWORD" mysqldump --protocol=tcp -h "$SOURCE_DB_HOST" -u "$SOURCE_DB_USER" --single-transaction --quick --routines --triggers --events --hex-blob --set-gtid-purged=OFF --no-tablespaces --column-statistics=0 "$SOURCE_DB_NAME" | gzip -1 > "/backup/' + $partialName + '"; mv "/backup/' + $partialName + '" "/backup/' + $fileName + '"'
+        $dumpCommand = 'set -euo pipefail; databases=("$SOURCE_DB_NAME"); if [ "$(MYSQL_PWD="$SOURCE_DB_PASSWORD" mysql --protocol=tcp -h "$SOURCE_DB_HOST" -u "$SOURCE_DB_USER" -N -B -e "SELECT COUNT(*) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME=''eis_identity''")" = "1" ]; then databases+=("eis_identity"); fi; MYSQL_PWD="$SOURCE_DB_PASSWORD" mysqldump --protocol=tcp -h "$SOURCE_DB_HOST" -u "$SOURCE_DB_USER" --single-transaction --quick --routines --triggers --events --hex-blob --set-gtid-purged=OFF --no-tablespaces --column-statistics=0 --databases "${databases[@]}" | gzip -1 > "/backup/' + $partialName + '"; mv "/backup/' + $partialName + '" "/backup/' + $fileName + '"'
         & docker run --rm --entrypoint bash `
             --mount "type=bind,src=$snapshotsDirectory,dst=/backup" `
             -e SOURCE_DB_HOST -e SOURCE_DB_NAME -e SOURCE_DB_USER -e SOURCE_DB_PASSWORD `
@@ -240,6 +244,7 @@ function Import-LocalSnapshot([string]$Requested, [switch]$AllowReplace) {
     }
 
     Invoke-Compose @("exec", "-T", "openmrs-local-db", "bash", "/opt/hcsba/local-db.sh", "import", $dump.Name)
+    Invoke-EisIdentityDatabase "migrate"
 
     $state = [ordered]@{
         importedAt = (Get-Date).ToUniversalTime().ToString("o")
@@ -264,7 +269,10 @@ function Start-LocalStack {
     }
     Invoke-Compose @("config", "--quiet")
     Invoke-Compose @("up", "-d", "keycloak-db", "keycloak", "keycloak-configurator")
-    Invoke-Compose @("up", "-d", "openmrs-local-db", "openmrs-local")
+    Invoke-Compose @("up", "-d", "openmrs-local-db")
+    Wait-LocalDatabase
+    Invoke-EisIdentityDatabase "migrate"
+    Invoke-Compose @("up", "-d", "openmrs-local")
     Invoke-Compose @("up", "-d", "patient-documents", "bahmni-web", "bahmni-next-web", "proxy")
     Write-Host "Stack local activo. /openmrs apunta al clon local; .205 no recibe escrituras." -ForegroundColor Green
 }
@@ -288,6 +296,7 @@ function Test-LocalStack {
     if ($LASTEXITCODE -ne 0 -or @($checks | Where-Object { $_.Trim() -ne "0" }).Count -ne 0) {
         throw "La comprobacion de aislamiento detecto tareas o publicaciones activas."
     }
+    Invoke-EisIdentityDatabase "verify"
     Write-Host "OK  OpenMRS local, callback OIDC HTTPS, proxy y aislamiento de efectos externos." -ForegroundColor Green
 }
 

@@ -17,6 +17,7 @@ Todos deben quedar como directorios hermanos dentro del mismo workspace.
 | `openmrs-module-ipd-frontend-hcsba-2024` | `main` | Referencia ejecutable de IPD/Care View legacy. |
 | `openmrs-module-ipd` | `hcsba/1.1.1-fix-ward-patients` | Codigo del OMOD IPD cuando se modifican contratos backend. No se monta en caliente. |
 | `openmrs-module-oauth2login-hcsba` | `hcsba/1.5.0-keycloak` | Fork reproducible del OMOD OAuth2. Se construye y despliega de forma controlada. |
+| `openmrs-module-eis-identity-hcsba` | `hcsba/eis-registration` | Validador RUN, metadatos EIS y migraciones de su esquema satélite. |
 
 El script usa las URLs publicas de la organizacion `HCSBA-bahmni` y clona automaticamente cualquier repositorio ausente.
 
@@ -81,7 +82,7 @@ Para ejecutar Next.js directamente en el host, detenga solo ese servicio, copie 
 - `ipd`: conserva el microfrontend legacy como referencia/rollback.
 - OpenMRS: se consume remotamente desde `https://10.68.174.205/openmrs`; no se duplica su base de datos en el equipo de frontend.
 
-El OMOD construido desde `openmrs-module-ipd` requiere build y despliegue controlado en OpenMRS. Reiniciar el compose frontend no despliega OMODs.
+Los OMOD construidos desde `openmrs-module-ipd` y `openmrs-module-eis-identity-hcsba` requieren build y despliegue controlado en OpenMRS. Reiniciar el compose frontend no despliega OMODs. El flujo EIS completo, sus compuertas y reversa están en [EIS_REGISTRATION.md](EIS_REGISTRATION.md).
 
 ## Variables de entorno
 
