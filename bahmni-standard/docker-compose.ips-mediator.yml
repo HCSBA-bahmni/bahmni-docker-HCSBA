@@ -1,0 +1,40 @@
+services:
+  ips-mediator:
+    build:
+      context: ./ips-mediator
+      dockerfile: Containerfile
+    image: hcsba/ips-mediator:0.1.0
+    profiles: ["ips"]
+    expose: ["8080"]
+    environment:
+      PUBLIC_ORIGIN: ${BAHMNI_PUBLIC_ORIGIN:-https://localhost}
+      IPS_UPSTREAM_BASE: ${IPS_UPSTREAM_BASE:?}
+      IPS_UPSTREAM_USERNAME_FILE: /run/secrets/ips_upstream_username
+      IPS_UPSTREAM_PASSWORD_FILE: /run/secrets/ips_upstream_password
+      OPENMRS_SESSION_URL: ${IPS_OPENMRS_SESSION_URL:?}
+      OPENMRS_REQUIRED_PRIVILEGE: ${IPS_OPENMRS_REQUIRED_PRIVILEGE:-app:clinical}
+      UPSTREAM_TLS_SKIP_VERIFY: ${IPS_UPSTREAM_TLS_SKIP_VERIFY:-false}
+    secrets:
+      - ips_upstream_username
+      - ips_upstream_password
+    healthcheck:
+      test: ["CMD", "/ips-mediator", "healthcheck"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+    restart: ${RESTART_POLICY:-unless-stopped}
+
+  bahmni-next-web:
+    environment:
+      NEXT_PUBLIC_IPS_ENABLED: "true"
+      NEXT_PUBLIC_IPS_PDQM_BASE: /openmrs/ips-mediator/regional
+      NEXT_PUBLIC_IPS_REGIONAL_BASE: /openmrs/ips-mediator/regional
+      NEXT_PUBLIC_IPS_VHL_GENERATE_PATH: /openmrs/ips-mediator/vhl/_generate
+      NEXT_PUBLIC_IPS_VHL_RESOLVE_PATH: /openmrs/ips-mediator/vhl/_resolve
+      NEXT_PUBLIC_ICVP_FROM_BUNDLE_PATH: /openmrs/ips-mediator/icvpcert/_from-bundle
+
+secrets:
+  ips_upstream_username:
+    file: ${IPS_UPSTREAM_USERNAME_FILE:?}
+  ips_upstream_password:
+    file: ${IPS_UPSTREAM_PASSWORD_FILE:?}

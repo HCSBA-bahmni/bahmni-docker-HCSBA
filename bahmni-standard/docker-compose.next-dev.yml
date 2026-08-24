@@ -2,7 +2,7 @@ services:
   proxy:
     command: /bin/sh -c 'exec httpd-foreground $${NEXT_PROXY_DEFINES}'
     environment:
-      NEXT_PROXY_DEFINES: ${NEXT_PROXY_DEFINES:--D NEXT_SHELL -D NEXT_REGISTRATION -D NEXT_CLINICAL -D NEXT_DOCUMENT_UPLOAD -D NEXT_ORDERS}
+      NEXT_PROXY_DEFINES: ${NEXT_PROXY_DEFINES:--D NEXT_SHELL -D NEXT_REGISTRATION -D NEXT_CLINICAL -D NEXT_DOCUMENT_UPLOAD -D NEXT_ORDERS -D NEXT_ADMIN_AUDIT_LOG}
     volumes:
       - ./bahmni-proxy.conf:/usr/local/apache2/conf/bahmni-proxy.conf:ro
 
@@ -33,6 +33,12 @@ services:
       NEXT_TELEMETRY_DISABLED: "1"
       WATCHPACK_POLLING: "true"
       WATCHPACK_POLLING_INTERVAL: "500"
+      NEXT_PUBLIC_IPS_ENABLED: ${IPS_MEDIATOR_ENABLED:-false}
+      NEXT_PUBLIC_IPS_PDQM_BASE: /openmrs/ips-mediator/regional
+      NEXT_PUBLIC_IPS_REGIONAL_BASE: /openmrs/ips-mediator/regional
+      NEXT_PUBLIC_IPS_VHL_GENERATE_PATH: /openmrs/ips-mediator/vhl/_generate
+      NEXT_PUBLIC_IPS_VHL_RESOLVE_PATH: /openmrs/ips-mediator/vhl/_resolve
+      NEXT_PUBLIC_ICVP_FROM_BUNDLE_PATH: /openmrs/ips-mediator/icvpcert/_from-bundle
     volumes:
       - ../../bahmni-nextjs-hcsba:/workspace
       - bahmni-next-dev-node-modules:/workspace/node_modules

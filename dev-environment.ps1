@@ -10,6 +10,7 @@ $workspace = Split-Path -Parent $dockerRepository
 $standardDirectory = Join-Path $dockerRepository "bahmni-standard"
 $baseCompose = Join-Path $standardDirectory "docker-compose.yml"
 $devCompose = Join-Path $standardDirectory "docker-compose.next-dev.yml"
+$ipsCompose = Join-Path $standardDirectory "docker-compose.ips-mediator.yml"
 $environmentFile = Join-Path $standardDirectory ".env"
 $composeProjectName = "bahmni-hcsba-dev"
 
@@ -56,6 +57,30 @@ function Convert-ToComposePath {
     return ([System.IO.Path]::GetFullPath($Path)).Replace("\", "/")
 }
 
+function Get-DotEnvValue {
+    param([string]$Path, [string]$Name)
+    if (-not (Test-Path -LiteralPath $Path)) { return $null }
+    $prefix = "$Name="
+    $line = [System.IO.File]::ReadAllLines($Path) | Where-Object { $_.StartsWith($prefix, [System.StringComparison]::Ordinal) } | Select-Object -Last 1
+    if (-not $line) { return $null }
+    return $line.Substring($prefix.Length).Trim()
+}
+
+function Test-IpsMediatorEnabled {
+    return (Get-DotEnvValue -Path $environmentFile -Name "IPS_MEDIATOR_ENABLED") -eq "true"
+}
+
+function Get-ComposeFileArguments {
+    $arguments = [System.Collections.Generic.List[string]]::new()
+    $arguments.Add("-f"); $arguments.Add($baseCompose)
+    $arguments.Add("-f"); $arguments.Add($devCompose)
+    if (Test-IpsMediatorEnabled) {
+        $arguments.Add("-f"); $arguments.Add($ipsCompose)
+        $arguments.Add("--profile"); $arguments.Add("ips")
+    }
+    return $arguments.ToArray()
+}
+
 function Initialize-Workspace {
     Assert-Command "git"
     Assert-Command "docker"
@@ -93,7 +118,8 @@ function Initialize-Workspace {
         PATIENT_DOCUMENTS_TAG = "1.1.1"
         BAHMNI_NEXT_WEB_IMAGE_TAG = "0.1.0-rc.0-ipd-tasks.5"
         CLINICAL_CONSULTATION_ENABLED = "true"
-        NEXT_PROXY_DEFINES = "-D NEXT_SHELL -D NEXT_REGISTRATION -D NEXT_CLINICAL -D NEXT_BEDMANAGEMENT -D NEXT_ADT -D NEXT_APPOINTMENTS -D NEXT_DOCUMENT_UPLOAD -D NEXT_ORDERS"
+        IPS_MEDIATOR_ENABLED = "false"
+        NEXT_PROXY_DEFINES = "-D NEXT_SHELL -D NEXT_REGISTRATION -D NEXT_CLINICAL -D NEXT_BEDMANAGEMENT -D NEXT_ADT -D NEXT_APPOINTMENTS -D NEXT_DOCUMENT_UPLOAD -D NEXT_ORDERS -D NEXT_ADMIN_AUDIT_LOG"
         REPORTS_DB_HOST = "reportsdb"
         RESTART_POLICY = "unless-stopped"
     }
@@ -129,7 +155,8 @@ function Invoke-Compose {
     }
     Push-Location $standardDirectory
     try {
-        & docker compose --project-name $composeProjectName --env-file $environmentFile -f $baseCompose -f $devCompose @Arguments
+        $composeFiles = Get-ComposeFileArguments
+        & docker compose --project-name $composeProjectName --env-file $environmentFile @composeFiles @Arguments
         if ($LASTEXITCODE -ne 0) {
             throw "docker compose termino con codigo $LASTEXITCODE."
         }
@@ -141,7 +168,8 @@ function Invoke-Compose {
 function Wait-NextHealth {
     $deadline = (Get-Date).AddMinutes(8)
     do {
-        $containerId = (& docker compose --project-name $composeProjectName --env-file $environmentFile -f $baseCompose -f $devCompose ps -q bahmni-next-web).Trim()
+        $composeFiles = Get-ComposeFileArguments
+        $containerId = (& docker compose --project-name $composeProjectName --env-file $environmentFile @composeFiles ps -q bahmni-next-web).Trim()
         if ($containerId) {
             $status = (& docker inspect --format "{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}" $containerId).Trim()
             if ($status -eq "healthy") {
@@ -157,6 +185,22 @@ function Wait-NextHealth {
     throw "Next.js no estuvo saludable dentro de ocho minutos."
 }
 
+function Wait-IpsMediatorHealth {
+    if (-not (Test-IpsMediatorEnabled)) { return }
+    $deadline = (Get-Date).AddMinutes(4)
+    do {
+        $composeFiles = Get-ComposeFileArguments
+        $containerId = (& docker compose --project-name $composeProjectName --env-file $environmentFile @composeFiles ps -q ips-mediator).Trim()
+        if ($containerId) {
+            $status = (& docker inspect --format "{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}" $containerId).Trim()
+            if ($status -eq "healthy") { Write-Host "OK  IPS mediator" -ForegroundColor Green; return }
+            if ($status -in @("unhealthy", "exited", "dead")) { throw "ips-mediator termino en estado $status." }
+        }
+        Start-Sleep -Seconds 3
+    } while ((Get-Date) -lt $deadline)
+    throw "IPS mediator no estuvo saludable dentro de cuatro minutos."
+}
+
 function Assert-Http200 {
     param([string]$Url)
     $status = (& curl.exe -k -s -o NUL -w "%{http_code}" $Url).Trim()
@@ -164,6 +208,15 @@ function Assert-Http200 {
         throw "$Url respondio HTTP $status."
     }
     Write-Host "OK  $Url" -ForegroundColor Green
+}
+
+function Assert-HttpContent {
+    param([string]$Url, [string]$Pattern, [string]$Description)
+    $response = (& curl.exe -k -s --fail $Url) -join "`n"
+    if ($LASTEXITCODE -ne 0 -or $response -notmatch $Pattern) {
+        throw "$Url no corresponde a $Description."
+    }
+    Write-Host "OK  $Description" -ForegroundColor Green
 }
 
 function Assert-RootEntryRedirect {
@@ -178,11 +231,17 @@ function Assert-RootEntryRedirect {
 function Test-Integration {
     Assert-Command "curl.exe"
     Wait-NextHealth
+    Wait-IpsMediatorHealth
     Assert-RootEntryRedirect
     Assert-Http200 "https://localhost/bahmni/api/health"
     Assert-Http200 "https://localhost/bahmni/bedmanagement"
     Assert-Http200 "https://localhost/bahmni/document-upload?encounterType=RADIOLOGY&topLevelConcept=All%20Radiology%20orders"
     Assert-Http200 "https://localhost/bahmni/orders"
+    Assert-Http200 "https://localhost/bahmni/admin"
+    Assert-HttpContent "https://localhost/bahmni/admin" '(?:__NEXT_DATA__|/bahmni/_next/)' "Administracion servida por Next.js"
+    Assert-Http200 "https://localhost/bahmni/admin/audit-log"
+    Assert-Http200 "https://localhost/bahmni/admin/beds"
+    Assert-Http200 "https://localhost/bahmni/admin-legacy/"
     Assert-Http200 "https://localhost/bahmni_config/openmrs/apps/home/app.json"
     Assert-Http200 "https://localhost/openmrs/ws/rest/v1/session"
 
@@ -217,6 +276,10 @@ switch ($Action) {
         Test-Integration
     }
     "verify" { Test-Integration }
-    "logs" { Invoke-Compose -Arguments @("logs", "-f", "--tail", "160", "proxy", "bahmni-next-web", "bahmni-config") }
+    "logs" {
+        $services = @("logs", "-f", "--tail", "160", "proxy", "bahmni-next-web", "bahmni-config")
+        if (Test-IpsMediatorEnabled) { $services += "ips-mediator" }
+        Invoke-Compose -Arguments $services
+    }
     "status" { Invoke-Compose -Arguments @("ps") }
 }
