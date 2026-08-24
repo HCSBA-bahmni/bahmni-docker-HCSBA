@@ -15,9 +15,9 @@ documentos EIS son identificadores adicionales gobernados.
 | `bahmni-docker-HCSBA` | montaje reproducible del OMOD, migración del esquema satélite, respaldo conjunto y verificación local |
 
 Las fuentes externas están fijadas en `standard-config-HCSBA/docs/eis-registration-migration.md`.
-La variante HCSBA validada corresponde al commit `688399f`; el artefacto local
+La variante HCSBA validada corresponde al commit `c092b6d`; el artefacto local
 `eisidentity-0.1.1-hcsba.1-SNAPSHOT.omod` produjo SHA-256
-`1E226BE1D6AAC7C850339FF9479706A38F88FD015FF7FB5B40D8FB0B9E8546CD`.
+`7804A46486AD02A58F3CC37685BCC99A38B83F40A668577565840607A148E9A5`.
 
 ## Laboratorio local aislado
 
