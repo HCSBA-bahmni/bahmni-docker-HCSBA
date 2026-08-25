@@ -47,6 +47,8 @@ cd bahmni-docker-HCSBA
 
 El primer inicio ejecuta `npm ci` dentro del volumen Docker de Next.js. Luego la aplicacion queda disponible directamente en `https://localhost`: el proxy envia la raiz a `/bahmni/home/` y Next.js inicia Keycloak si no existe una sesion OpenMRS valida.
 
+`bootstrap` y `up` preparan un certificado de servidor con SAN para `localhost`, firmado por la CA de desarrollo HCSBA. En Windows la CA se importa solamente en el almacen de confianza del usuario actual. El proxy monta este certificado en todos los modos locales y lo renueva cuando le queda menos de una semana de vigencia; las verificaciones HTTPS no omiten la validacion TLS.
+
 ## Trabajo diario
 
 ```powershell

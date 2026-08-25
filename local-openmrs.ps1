@@ -149,11 +149,6 @@ function New-DevelopmentCertificate {
     $caCert = Join-Path $tlsDirectory "local-dev-ca-cert.pem"
     $csr = Join-Path $tlsDirectory "sso-dev.csr"
     $extension = Join-Path $tlsDirectory "dev-server-ext.cnf"
-    if ((Test-Path -LiteralPath $key) -and (Test-Path -LiteralPath $cert) -and
-        (Test-Path -LiteralPath $caKey) -and (Test-Path -LiteralPath $caCert)) {
-        Write-Host "El certificado SSO ya existe; no se sobrescribio." -ForegroundColor Yellow
-        return
-    }
     if ((Test-Path -LiteralPath $key) -xor (Test-Path -LiteralPath $cert)) {
         throw "El par servidor TLS esta incompleto en $tlsDirectory."
     }
@@ -170,7 +165,8 @@ function New-DevelopmentCertificate {
 
     & docker run --rm --entrypoint sh --mount $mount $opensslImage /tls/generate-dev-certificate.sh
     if ($LASTEXITCODE -ne 0) { throw "OpenSSL no pudo generar el material TLS local." }
-    Write-Host "Certificado servidor creado por 30 dias. Importe $caCert como raiz confiable solo en DEV." -ForegroundColor Green
+    Write-Host "Certificado servidor de desarrollo vigente; se renueva antes de expirar." -ForegroundColor Green
+    Write-Host "Importe $caCert como raiz confiable solo en DEV si aun no esta instalada." -ForegroundColor Yellow
     Write-Host "Agregue tambien '127.0.0.1 sso-dev.hcsba.local' al archivo hosts si el nombre no resuelve localmente." -ForegroundColor Yellow
 }
 

@@ -12,6 +12,12 @@ $baseCompose = Join-Path $standardDirectory "docker-compose.yml"
 $devCompose = Join-Path $standardDirectory "docker-compose.next-dev.yml"
 $ipsCompose = Join-Path $standardDirectory "docker-compose.ips-mediator.yml"
 $environmentFile = Join-Path $standardDirectory ".env"
+$tlsDirectory = Join-Path $standardDirectory "keycloak\tls"
+$tlsCertificate = Join-Path $tlsDirectory "sso-dev-cert.pem"
+$tlsKey = Join-Path $tlsDirectory "sso-dev-key.pem"
+$tlsCaCertificate = Join-Path $tlsDirectory "local-dev-ca-cert.pem"
+$tlsCaKey = Join-Path $tlsDirectory "local-dev-ca-key.pem"
+$tlsGenerator = Join-Path $tlsDirectory "generate-dev-certificate.sh"
 $composeProjectName = "bahmni-hcsba-dev"
 
 $repositories = @(
@@ -70,6 +76,48 @@ function Test-IpsMediatorEnabled {
     return (Get-DotEnvValue -Path $environmentFile -Name "IPS_MEDIATOR_ENABLED") -eq "true"
 }
 
+function Get-PemCertificateThumbprint {
+    param([string]$Path)
+    $pem = [System.IO.File]::ReadAllText($Path)
+    $payload = (($pem -split "`r?`n") | Where-Object {
+        $_ -and -not $_.StartsWith("-----", [System.StringComparison]::Ordinal)
+    }) -join ""
+    $bytes = [Convert]::FromBase64String($payload)
+    $certificate = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($bytes)
+    try { return $certificate.Thumbprint }
+    finally { $certificate.Dispose() }
+}
+
+function Initialize-DevelopmentTls {
+    if (-not (Test-Path -LiteralPath $environmentFile)) {
+        throw "Falta $environmentFile. Ejecute primero: .\dev-environment.ps1 bootstrap"
+    }
+    if (-not (Test-Path -LiteralPath $tlsGenerator)) { throw "Falta $tlsGenerator." }
+
+    New-Item -ItemType Directory -Force -Path $tlsDirectory | Out-Null
+    $proxyTag = Get-DotEnvValue -Path $environmentFile -Name "PROXY_IMAGE_TAG"
+    if ([string]::IsNullOrWhiteSpace($proxyTag)) { throw "Falta PROXY_IMAGE_TAG en $environmentFile." }
+    $mount = "type=bind,src=$tlsDirectory,dst=/tls"
+    & docker run --rm --entrypoint sh --mount $mount "bahmni/proxy:$proxyTag" /tls/generate-dev-certificate.sh
+    if ($LASTEXITCODE -ne 0) { throw "No fue posible preparar el certificado TLS de desarrollo." }
+
+    foreach ($path in @($tlsCertificate, $tlsKey, $tlsCaCertificate, $tlsCaKey)) {
+        if (-not (Test-Path -LiteralPath $path)) { throw "Falta material TLS esperado: $path" }
+    }
+
+    if ([System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT) {
+        $thumbprint = Get-PemCertificateThumbprint -Path $tlsCaCertificate
+        $trusted = Get-ChildItem Cert:\CurrentUser\Root | Where-Object { $_.Thumbprint -eq $thumbprint }
+        if (-not $trusted) {
+            if (-not (Get-Command Import-Certificate -ErrorAction SilentlyContinue)) {
+                throw "Import-Certificate no esta disponible para confiar la CA local de desarrollo."
+            }
+            Import-Certificate -FilePath $tlsCaCertificate -CertStoreLocation Cert:\CurrentUser\Root | Out-Null
+            Write-Host "CA local de desarrollo importada en el almacen del usuario actual." -ForegroundColor Green
+        }
+    }
+}
+
 function Get-ComposeFileArguments {
     $arguments = [System.Collections.Generic.List[string]]::new()
     $arguments.Add("-f"); $arguments.Add($baseCompose)
@@ -126,6 +174,8 @@ function Initialize-Workspace {
     foreach ($entry in $environmentValues.GetEnumerator()) {
         Set-DotEnvValue -Path $environmentFile -Name $entry.Key -Value $entry.Value
     }
+
+    Initialize-DevelopmentTls
 
     $nextRepository = Join-Path $workspace "bahmni-nextjs-hcsba"
     $nextLocalEnv = Join-Path $nextRepository ".env.local"
@@ -203,7 +253,9 @@ function Wait-IpsMediatorHealth {
 
 function Assert-Http200 {
     param([string]$Url)
-    $status = (& curl.exe -k -s -o NUL -w "%{http_code}" $Url).Trim()
+    # Schannel exige una fuente de revocacion que una CA local de desarrollo no
+    # publica. Se omite solo esa consulta; cadena, nombre y vigencia se validan.
+    $status = (& curl.exe --ssl-no-revoke -s -o NUL -w "%{http_code}" $Url).Trim()
     if ($status -ne "200") {
         throw "$Url respondio HTTP $status."
     }
@@ -212,7 +264,7 @@ function Assert-Http200 {
 
 function Assert-HttpContent {
     param([string]$Url, [string]$Pattern, [string]$Description)
-    $response = (& curl.exe -k -s --fail $Url) -join "`n"
+    $response = (& curl.exe --ssl-no-revoke -s --fail $Url) -join "`n"
     if ($LASTEXITCODE -ne 0 -or $response -notmatch $Pattern) {
         throw "$Url no corresponde a $Description."
     }
@@ -220,7 +272,7 @@ function Assert-HttpContent {
 }
 
 function Assert-RootEntryRedirect {
-    $response = (& curl.exe -k -s -D - -o NUL "https://localhost/") -join "`n"
+    $response = (& curl.exe --ssl-no-revoke -s -D - -o NUL "https://localhost/") -join "`n"
     if ($response -notmatch '(?m)^HTTP/\S+ 302\b' -or
         $response -notmatch '(?mi)^Location:\s*(?:https://localhost)?/bahmni/home/\s*$') {
         throw "https://localhost/ no redirigio a /bahmni/home/."
@@ -245,7 +297,7 @@ function Test-Integration {
     Assert-Http200 "https://localhost/bahmni_config/openmrs/apps/home/app.json"
     Assert-Http200 "https://localhost/openmrs/ws/rest/v1/session"
 
-    $hmr = & curl.exe -k --http1.1 -s -i --max-time 3 `
+    $hmr = & curl.exe --ssl-no-revoke --http1.1 -s -i --max-time 3 `
         -H "Connection: Upgrade" `
         -H "Upgrade: websocket" `
         -H "Sec-WebSocket-Version: 13" `
@@ -264,15 +316,17 @@ Assert-Command "docker"
 switch ($Action) {
     "bootstrap" { Initialize-Workspace }
     "up" {
+        Initialize-DevelopmentTls
         Invoke-Compose -Arguments @("config", "--quiet")
-        Invoke-Compose -Arguments @("up", "-d", "--remove-orphans")
+        Invoke-Compose -Arguments @("up", "-d")
         Test-Integration
     }
-    "down" { Invoke-Compose -Arguments @("down", "--remove-orphans") }
+    "down" { Invoke-Compose -Arguments @("down") }
     "recreate" {
-        Invoke-Compose -Arguments @("down", "--remove-orphans")
+        Initialize-DevelopmentTls
+        Invoke-Compose -Arguments @("down")
         Invoke-Compose -Arguments @("config", "--quiet")
-        Invoke-Compose -Arguments @("up", "-d", "--remove-orphans")
+        Invoke-Compose -Arguments @("up", "-d")
         Test-Integration
     }
     "verify" { Test-Integration }

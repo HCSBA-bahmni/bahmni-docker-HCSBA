@@ -5,6 +5,8 @@ services:
       NEXT_PROXY_DEFINES: ${NEXT_PROXY_DEFINES:--D NEXT_SHELL -D NEXT_REGISTRATION -D NEXT_CLINICAL -D NEXT_DOCUMENT_UPLOAD -D NEXT_ORDERS -D NEXT_ADMIN_AUDIT_LOG}
     volumes:
       - ./bahmni-proxy.conf:/usr/local/apache2/conf/bahmni-proxy.conf:ro
+      - ./keycloak/tls/sso-dev-cert.pem:/etc/tls/cert.pem:ro
+      - ./keycloak/tls/sso-dev-key.pem:/etc/tls/key.pem:ro
 
   bahmni-web:
     volumes:
