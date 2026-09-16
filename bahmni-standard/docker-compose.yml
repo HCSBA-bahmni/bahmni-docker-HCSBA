@@ -29,6 +29,7 @@ services:
     environment:
       TZ: ${TZ}
       NEXT_PROXY_DEFINES: ${NEXT_PROXY_DEFINES:--D NEXT_SHELL -D NEXT_REGISTRATION -D NEXT_CLINICAL}
+      BIOMETRIC_API_KEY: ${BIOMETRIC_API_KEY:-local-biometric-proxy-key-change-in-production}
 
   bahmni-config:
     image: 'hcsba/standard-config:${CONFIG_IMAGE_TAG:?}'
@@ -386,6 +387,53 @@ services:
     logging: *log-config
     restart: ${RESTART_POLICY}
 
+  mpi-biometric-db:
+    image: pgvector/pgvector:0.8.6-pg16-bookworm
+    profiles: [ "emr", "bahmni-standard", "bahmni-mart" ]
+    environment:
+      TZ: ${TZ}
+      POSTGRES_DB: biometric
+      POSTGRES_USER: biometric
+      POSTGRES_PASSWORD: ${BIOMETRIC_POSTGRES_PASSWORD:-change-me-before-production}
+    volumes:
+      - 'mpi-biometric-dbdata:/var/lib/postgresql/data'
+      - '../biometric-service/sql/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql:ro'
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U biometric -d biometric" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    logging: *log-config
+    restart: ${RESTART_POLICY}
+
+  mpi-biometric-api:
+    build:
+      context: ../biometric-service
+    profiles: [ "emr", "bahmni-standard", "bahmni-mart" ]
+    expose:
+      - "8000"
+    environment:
+      TZ: ${TZ}
+      DATABASE_URL: postgresql://biometric:${BIOMETRIC_POSTGRES_PASSWORD:-change-me-before-production}@mpi-biometric-db:5432/biometric
+      STORAGE_BACKEND: postgres
+      CORS_ORIGINS: ""
+      YUNET_MODEL_PATH: /app/models/face_detection_yunet_2023mar.onnx
+      SFACE_MODEL_PATH: /app/models/face_recognition_sface_2021dec.onnx
+      DETECTOR_SCORE_THRESHOLD: ${BIOMETRIC_DETECTOR_SCORE_THRESHOLD:-0.80}
+      ASSESSMENT_SCORE_THRESHOLD: ${BIOMETRIC_ASSESSMENT_SCORE_THRESHOLD:-0.65}
+      SIMILARITY_THRESHOLD: ${BIOMETRIC_SIMILARITY_THRESHOLD:-0.363}
+      API_KEY: ${BIOMETRIC_API_KEY:-local-biometric-proxy-key-change-in-production}
+    depends_on:
+      mpi-biometric-db:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging: *log-config
+    restart: ${RESTART_POLICY}
+
   implementer-interface:
     image: bahmni/implementer-interface:${IMPLEMENTER_INTERFACE_IMAGE_TAG:?}
     profiles: [ "implementer-interface", "emr", "bahmni-standard" ]
@@ -654,3 +702,4 @@ volumes:
   reportsdbdata:
   pacsdbdata:
   dcm4chee-config:
+  mpi-biometric-dbdata:

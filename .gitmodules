@@ -1,0 +1,3 @@
+[submodule "biometric-service"]
+	path = biometric-service
+	url = https://github.com/HCSBA-bahmni/api_reconocimiento_facial.git
