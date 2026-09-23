@@ -1,0 +1,9 @@
+ARG BAHMNI_PROXY_IMAGE=bahmni/proxy:1.1.0
+
+FROM ${BAHMNI_PROXY_IMAGE}
+
+COPY bahmni-proxy.conf /usr/local/apache2/conf/bahmni-proxy.conf
+
+LABEL org.opencontainers.image.title="HCSBA Bahmni Proxy" \
+      org.opencontainers.image.description="Bahmni Apache proxy with the HCSBA Next.js and biometric routes" \
+      org.opencontainers.image.source="https://github.com/HCSBA-bahmni/bahmni-docker-HCSBA"

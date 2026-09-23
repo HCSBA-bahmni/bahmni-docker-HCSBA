@@ -25,6 +25,19 @@ certificado debe cubrir el nombre o IP real que usan los clientes. Antes de un
 corte se respaldan de forma consistente `openmrs` y `eis_identity`, se valida
 el OMOD EIS, y se construyen todas las imágenes con etiquetas inmutables.
 
+Las imágenes HCSBA se publican en GitHub Container Registry:
+
+- `ghcr.io/hcsba-bahmni/bahmni-next-web`
+- `ghcr.io/hcsba-bahmni/standard-config`
+- `ghcr.io/hcsba-bahmni/mpi-biometric-api`
+- `ghcr.io/hcsba-bahmni/mpi-biometric-db`
+- `ghcr.io/hcsba-bahmni/openmrs-eis`
+- `ghcr.io/hcsba-bahmni/bahmni-proxy`
+
+El proxy empaqueta su configuración, pero nunca los certificados ni secretos.
+La imagen de base biométrica incluye únicamente el inicializador de esquema;
+los embeddings permanecen en un volumen PostgreSQL externo.
+
 La reversa de frontend consiste en retirar del proxy los defines `NEXT_*` y
 recrear únicamente `proxy`; el fallback `/bahmni` permanece en AngularJS. La
 reversa EIS sigue el orden documentado en `EIS_REGISTRATION.md`: quitar primero
