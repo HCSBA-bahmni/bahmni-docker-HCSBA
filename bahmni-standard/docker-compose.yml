@@ -669,3 +669,4 @@ volumes:
   reportsdbdata:
   pacsdbdata:
   dcm4chee-config:
+  mpi-biometric-dbdata:
