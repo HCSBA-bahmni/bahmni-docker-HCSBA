@@ -1,0 +1,14 @@
+FROM quay.io/keycloak/keycloak:26.7.0@sha256:0f198be292568439d700cdbfb893e69a6009bb43a94a06a945b1d3d506c76b13 AS builder
+
+ENV KC_DB=postgres \
+    KC_HEALTH_ENABLED=true \
+    KC_METRICS_ENABLED=true
+RUN /opt/keycloak/bin/kc.sh build
+
+FROM quay.io/keycloak/keycloak:26.7.0@sha256:0f198be292568439d700cdbfb893e69a6009bb43a94a06a945b1d3d506c76b13
+COPY --from=builder /opt/keycloak/ /opt/keycloak/
+COPY realm-hcsba.json /opt/keycloak/data/import/realm-hcsba.json
+COPY themes /opt/keycloak/themes
+COPY start-keycloak.sh /opt/hcsba/start-keycloak.sh
+USER 1000
+ENTRYPOINT ["/opt/hcsba/start-keycloak.sh"]

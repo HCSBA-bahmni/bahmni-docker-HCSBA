@@ -1,0 +1,4 @@
+interface:
+  display_name: "Bahmni Dev Environment"
+  short_description: "Levanta y diagnostica el entorno Bahmni HCSBA"
+  default_prompt: "Use $bahmni-dev-environment to bootstrap, run, verify, or troubleshoot the HCSBA Bahmni development stack."
