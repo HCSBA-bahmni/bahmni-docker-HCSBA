@@ -18,6 +18,7 @@ Todos deben quedar como directorios hermanos dentro del mismo workspace.
 | `openmrs-module-ipd` | `hcsba/1.1.1-fix-ward-patients` | Codigo del OMOD IPD cuando se modifican contratos backend. No se monta en caliente. |
 | `openmrs-module-oauth2login-hcsba` | `hcsba/1.5.0-keycloak` | Fork reproducible del OMOD OAuth2. Se construye y despliega de forma controlada. |
 | `openmrs-module-eis-identity-hcsba` | `hcsba/eis-registration` | Validador RUN, metadatos EIS y migraciones de su esquema satélite. |
+| `api_reconocimiento_facial` | `main` | API de enrolamiento, búsqueda y verificación biométrica facial; guarda embeddings en PostgreSQL/pgvector. |
 
 El script usa las URLs publicas de la organizacion `HCSBA-bahmni` y clona automaticamente cualquier repositorio ausente.
 
@@ -40,7 +41,7 @@ cd bahmni-docker-HCSBA
 
 `bootstrap` realiza lo siguiente sin sobrescribir archivos locales existentes:
 
-1. Clona los otros cinco repositorios como hermanos.
+1. Clona los repositorios requeridos como hermanos, incluida la API de reconocimiento facial.
 2. Crea `bahmni-standard/.env` desde `.env.dev` y aplica los valores de integracion HCSBA.
 3. Crea `bahmni-nextjs-hcsba/.env.local` desde `.example-env`.
 4. Instala las dependencias de la aplicacion legacy con Node 10 si faltan.
@@ -80,6 +81,8 @@ Para ejecutar Next.js directamente en el host, detenga solo ese servicio, copie 
 - `proxy`: termina HTTPS, enruta las aplicaciones y eleva `/bahmni/_next/webpack-hmr` como WebSocket. Los defines `NEXT_DOCUMENT_UPLOAD`, `NEXT_ORDERS` y `NEXT_ADMIN_AUDIT_LOG` dirigen esos módulos a sus rutas Next.js; `/bahmni/admin-legacy` conserva el rollback de Administración.
 - `bahmni-next-web`: Node 24 Alpine, codigo montado desde el host y dependencias en volumen nombrado.
 - `bahmni-config`: sirve `standard-config-HCSBA` desde el checkout local.
+- `mpi-biometric-api`: ejecuta la API facial desde `api_reconocimiento_facial` y se publica solamente mediante `/biometric-api` en el proxy.
+- `mpi-biometric-db`: PostgreSQL con pgvector para embeddings biométricos; las fotografías no se persisten.
 - `bahmni-web`: conserva AngularJS para referencia y rutas que aun no han sido cortadas.
 - `ipd`: conserva el microfrontend legacy como referencia/rollback.
 - OpenMRS: se consume remotamente desde `https://10.68.174.205/openmrs`; no se duplica su base de datos en el equipo de frontend.
@@ -132,7 +135,8 @@ Cambiar sólo `AUTH_MODE` modifica el flujo visible de Next.js, pero no instala 
 2. Iniciar sesion y entrar a Clinico y Camas.
 3. Editar un texto o estilo en `bahmni-nextjs-hcsba/src`; la pagina debe actualizarse sin reconstruir imagen ni pulsar F5.
 4. Confirmar que `https://localhost/openmrs/ws/rest/v1/session` responde y que las configuraciones se leen desde `/bahmni_config`.
-5. Comparar cualquier escritura clinica contra legacy antes de modificar payloads o endpoints.
+5. Confirmar que `https://localhost/biometric-api/health` responde; las operaciones bajo `/biometric-api/biometric/` requieren sesión OpenMRS.
+6. Comparar cualquier escritura clinica contra legacy antes de modificar payloads o endpoints.
 
 ## Recuperacion
 

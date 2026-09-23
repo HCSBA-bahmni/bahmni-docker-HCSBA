@@ -45,6 +45,8 @@ Usar `recreate` únicamente cuando sea necesario bajar y volver a crear el proye
 - `/bahmni` y `/_next` resuelven al contenedor Next.js según los defines activos.
 - `/openmrs` se proxifica al backend `10.68.174.205:443`.
 - `/bahmni_config` y `/implementation_config` se sirven desde `standard-config-HCSBA`.
+- `/biometric-api` resuelve a la API facial local; Apache inyecta la clave interna y las operaciones biométricas requieren la cookie de sesión OpenMRS.
+- `mpi-biometric-db` conserva únicamente embeddings en PostgreSQL/pgvector; no se deben persistir fotografías.
 - Las aplicaciones AngularJS se montan desde `openmrs-module-bahmniapps-hcsba-2024` para paridad y rollback.
 - `docker-compose.next-dev.yml` reemplaza sólo `bahmni-next-web` por Node en modo `next dev --webpack`, monta el código fuente y activa Watchpack polling para Docker Desktop sobre Windows.
 - El WebSocket `/bahmni/_next/webpack-hmr` debe conservar HTTP 101 para Fast Refresh.
@@ -64,6 +66,7 @@ La verificación debe confirmar:
 
 - Contenedor `bahmni-next-web` saludable.
 - HTTP 200 en `/bahmni/api/health`.
+- HTTP 200 en `/biometric-api/health`.
 - HTTP 200 en `/bahmni/bedmanagement`.
 - HTTP 200 para configuración HCSBA.
 - Acceso same-origin a la sesión OpenMRS.

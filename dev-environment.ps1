@@ -25,7 +25,8 @@ $repositories = @(
     @{ Name = "standard-config-HCSBA"; Url = "https://github.com/HCSBA-bahmni/standard-config-HCSBA.git"; Branch = "master" },
     @{ Name = "openmrs-module-bahmniapps-hcsba-2024"; Url = "https://github.com/HCSBA-bahmni/openmrs-module-bahmniapps-hcsba-2024.git"; Branch = "master" },
     @{ Name = "openmrs-module-ipd-frontend-hcsba-2024"; Url = "https://github.com/HCSBA-bahmni/openmrs-module-ipd-frontend-hcsba-2024.git"; Branch = "main" },
-    @{ Name = "openmrs-module-ipd"; Url = "https://github.com/HCSBA-bahmni/openmrs-module-ipd.git"; Branch = "hcsba/1.1.1-fix-ward-patients" }
+    @{ Name = "openmrs-module-ipd"; Url = "https://github.com/HCSBA-bahmni/openmrs-module-ipd.git"; Branch = "hcsba/1.1.1-fix-ward-patients" },
+    @{ Name = "api_reconocimiento_facial"; Url = "https://github.com/HCSBA-bahmni/api_reconocimiento_facial.git"; Branch = "main" }
 )
 
 function Assert-Command {
@@ -286,6 +287,7 @@ function Test-Integration {
     Wait-IpsMediatorHealth
     Assert-RootEntryRedirect
     Assert-Http200 "https://localhost/bahmni/api/health"
+    Assert-Http200 "https://localhost/biometric-api/health"
     Assert-Http200 "https://localhost/bahmni/bedmanagement"
     Assert-Http200 "https://localhost/bahmni/document-upload?encounterType=RADIOLOGY&topLevelConcept=All%20Radiology%20orders"
     Assert-Http200 "https://localhost/bahmni/orders"
@@ -331,7 +333,7 @@ switch ($Action) {
     }
     "verify" { Test-Integration }
     "logs" {
-        $services = @("logs", "-f", "--tail", "160", "proxy", "bahmni-next-web", "bahmni-config")
+        $services = @("logs", "-f", "--tail", "160", "proxy", "bahmni-next-web", "bahmni-config", "mpi-biometric-api", "mpi-biometric-db")
         if (Test-IpsMediatorEnabled) { $services += "ips-mediator" }
         Invoke-Compose -Arguments $services
     }
