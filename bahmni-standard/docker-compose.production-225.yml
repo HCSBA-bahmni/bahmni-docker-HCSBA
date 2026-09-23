@@ -1,0 +1,80 @@
+services:
+  proxy:
+    command: /bin/sh -c 'exec httpd-foreground $${NEXT_PROXY_DEFINES}'
+    environment:
+      BIOMETRIC_API_KEY: ${BIOMETRIC_API_KEY:?configure BIOMETRIC_API_KEY in .env}
+      NEXT_PROXY_DEFINES: ${NEXT_PROXY_DEFINES:?configure NEXT_PROXY_DEFINES in .env}
+    volumes:
+      - ./production-225/bahmni-proxy.conf:/usr/local/apache2/conf/bahmni-proxy.conf:ro
+      - ./production-225/tls:/etc/tls:ro
+
+  bahmni-next-web:
+    image: hcsba/bahmni-next-web:${BAHMNI_NEXT_WEB_IMAGE_TAG:?configure BAHMNI_NEXT_WEB_IMAGE_TAG in .env}
+    profiles: [ "emr", "bahmni-standard", "bahmni-mart" ]
+    expose:
+      - "3000"
+    environment:
+      TZ: ${TZ}
+      NEXT_PUBLIC_OPENMRS_BASE: /openmrs
+      NEXT_PUBLIC_CONFIG_BASE: /bahmni_config/openmrs/apps
+      NEXT_PUBLIC_IMPLEMENTATION_CONFIG_BASE: /implementation_config/openmrs/apps
+      NEXT_PUBLIC_LEGACY_BAHMNI_BASE: /bahmni
+      NEXT_PUBLIC_DEFAULT_LOCALE: es
+      NEXT_PUBLIC_CLINICAL_CONSULTATION_ENABLED: "true"
+      NEXT_PUBLIC_AUTH_MODE: openmrs
+    healthcheck:
+      test: [ "CMD", "wget", "-qO-", "http://127.0.0.1:3000/bahmni/api/health" ]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+    restart: ${RESTART_POLICY}
+
+  mpi-biometric-db:
+    image: pgvector/pgvector:0.8.6-pg16-bookworm
+    profiles: [ "emr", "bahmni-standard", "bahmni-mart" ]
+    environment:
+      POSTGRES_DB: biometric
+      POSTGRES_USER: biometric
+      POSTGRES_PASSWORD: ${BIOMETRIC_POSTGRES_PASSWORD:?configure BIOMETRIC_POSTGRES_PASSWORD in .env}
+    volumes:
+      - mpi-biometric-dbdata:/var/lib/postgresql/data
+      - ../../api_reconocimiento_facial/sql/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql:ro
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U biometric -d biometric" ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: ${RESTART_POLICY}
+
+  mpi-biometric-api:
+    image: hcsba/mpi-biometric-api:${BIOMETRIC_API_IMAGE_TAG:?configure BIOMETRIC_API_IMAGE_TAG in .env}
+    profiles: [ "emr", "bahmni-standard", "bahmni-mart" ]
+    expose:
+      - "8000"
+    environment:
+      DATABASE_URL: postgresql://biometric:${BIOMETRIC_POSTGRES_PASSWORD}@mpi-biometric-db:5432/biometric
+      STORAGE_BACKEND: postgres
+      CORS_ORIGINS: ""
+      API_KEY: ${BIOMETRIC_API_KEY}
+      YUNET_MODEL_PATH: /app/models/face_detection_yunet_2023mar.onnx
+      SFACE_MODEL_PATH: /app/models/face_recognition_sface_2021dec.onnx
+      SIMILARITY_THRESHOLD: ${BIOMETRIC_MATCH_THRESHOLD:-0.363}
+    depends_on:
+      mpi-biometric-db:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)" ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: ${RESTART_POLICY}
+
+volumes:
+  mpi-biometric-dbdata:
