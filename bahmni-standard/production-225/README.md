@@ -110,3 +110,24 @@ dos archivos modificados en
 a `.env`, validar `config --quiet` y recrear solamente `bahmni-next-web` con
 la misma composición. La carpeta de respaldos tiene acceso restringido y no
 se debe versionar su archivo de entorno.
+
+## Interfaz visual y Registro MPI (16-10-2026)
+
+La imagen activa de Next.js es `hcsba/bahmni-next-web:2026.10.16-visual-mpi.2`
+(commit `7905574`, imagen `sha256:edb3ff6dea23279781d0933c025abfe4139ce87e9f6c12569f78771f35932399`).
+Integra el sistema visual nuevo con el flujo de admisión MPI y corrige el desborde
+horizontal del pie de Registro en ancho de tableta. El gateway sigue en
+`hcsba/mpi-admission-gateway:2026.10.16-mpi-prod.1`.
+
+El checkout Next.js de `.225` está en `7905574` y la configuración fuente en
+`0c4c621`. Se recreó solo `bahmni-next-web` con los tres archivos Compose; el
+proxy, gateway, OpenMRS y los volúmenes clínicos no se recrearon. La imagen de
+`bahmni-config` sigue en `2026.09.23-eis.1`; actualizar ese servicio requiere
+revisar por separado los cambios de formularios y masterdata.
+
+La validación incluyó build standalone, 596 pruebas unitarias, 33 pruebas E2E
+en Chromium contra `.225`, healthcheck `healthy`, y HTTP 200 en salud y rutas de
+Registro. Para volver al tag anterior, en `.225` se guardó el overlay previo en
+`production-225/docker-compose.mpi-admission.yml.bak-20261016-v1`. Restaurarlo,
+validar `config --quiet` y recrear solo `bahmni-next-web` con `--no-deps
+--no-build --pull never`.
