@@ -121,9 +121,8 @@ horizontal del pie de Registro en ancho de tableta. El gateway sigue en
 
 El checkout Next.js de `.225` está en `7905574` y la configuración fuente en
 `0c4c621`. Se recreó solo `bahmni-next-web` con los tres archivos Compose; el
-proxy, gateway, OpenMRS y los volúmenes clínicos no se recrearon. La imagen de
-`bahmni-config` sigue en `2026.09.23-eis.1`; actualizar ese servicio requiere
-revisar por separado los cambios de formularios y masterdata.
+proxy, gateway, OpenMRS y los volúmenes clínicos no se recrearon. Posteriormente
+se actualizó también `bahmni-config`, según la entrega documentada abajo.
 
 La validación incluyó build standalone, 596 pruebas unitarias, 33 pruebas E2E
 en Chromium contra `.225`, healthcheck `healthy`, y HTTP 200 en salud y rutas de
@@ -131,3 +130,34 @@ Registro. Para volver al tag anterior, en `.225` se guardó el overlay previo en
 `production-225/docker-compose.mpi-admission.yml.bak-20261016-v1`. Restaurarlo,
 validar `config --quiet` y recrear solo `bahmni-next-web` con `--no-deps
 --no-build --pull never`.
+
+## Configuración compartida actualizada (16-10-2026)
+
+La imagen activa es `hcsba/standard-config:2026.10.16-config.1`, construida en
+`.225` desde `standard-config-HCSBA` commit `0c4c621` con
+`package/docker/Dockerfile`. Su identificador es
+`sha256:cff45831c7e363a497d72a3dd9568177a8230010141b3787aaa546a640af80b1`.
+El archivo `.env` remoto selecciona `CONFIG_IMAGE_TAG=2026.10.16-config.1`.
+
+Antes del cambio se comprobó que el volumen compartido coincidía exactamente
+con la imagen anterior, sin ajustes exclusivos del host. Se validaron los 60
+archivos modificados: 30 JSON, 26 CSV, 2 XML, un ZIP y el JavaScript de
+validación (con `node --check`). Después de recrear solo
+`bahmni-config`, los 310 archivos del volumen coincidieron por SHA-256 con las
+fuentes, y cinco rutas públicas de configuración y traducciones respondieron
+HTTP 200 con los mismos bytes del repositorio.
+
+Las cinco pruebas E2E de permisos de Registro pasaron contra `.225`. La sesión
+real de OpenMRS, el visor MPI autenticado, la salud de Next y la ruta de alta
+respondieron HTTP 200. Los demás contenedores conservaron sus identificadores.
+Los archivos de masterdata quedan disponibles en el volumen; esta entrega no
+reejecuta el importador de masterdata sobre la base de OpenMRS.
+
+El respaldo privado está en
+`/home/arki/bahmni/backups/standard-config-20261016/`: incluye `environment.before`,
+`config-before.tgz`, inventarios y las verificaciones. El SHA-256 del archivo de
+configuración respaldado es
+`bfe2fc464608bc4a35363784f1d1b9311ee0650d99cf01d2326bf1ccd60243e9`.
+Para reversa, seleccionar `CONFIG_IMAGE_TAG=2026.09.23-eis.1`, validar el Compose
+con los mismos tres archivos y recrear solo `bahmni-config` usando
+`up -d --no-deps --no-build --pull never bahmni-config`.
