@@ -1,7 +1,7 @@
 # Admisión MPI del Bahmni de .225. Se suma al Compose base y a production-225.
 services:
   bahmni-next-web:
-    image: hcsba/bahmni-next-web:2026.10.06-mpi-link.1
+    image: hcsba/bahmni-next-web:2026.10.16-visual-mpi.1
     environment:
       NEXT_PUBLIC_MPI_ADMISSION_MODE: integrated
       NEXT_PUBLIC_MPI_ADMISSION_BASE: /openmrs/mpi-admission-gateway
