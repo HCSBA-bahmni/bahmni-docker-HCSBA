@@ -1,0 +1,39 @@
+services:
+  mpi-admission-gateway:
+    build: ./mpi-admission-gateway
+    image: hcsba/mpi-admission-gateway:0.1.0
+    environment:
+      MPI_ADMISSION_MODE: ${MPI_ADMISSION_MODE:-preview}
+      MPI_OPENHIM_BASE_URL: ${MPI_OPENHIM_BASE_URL:-http://10.68.174.206:5001}
+      MPI_OPENHIM_ADMISSION_PATH: ${MPI_OPENHIM_ADMISSION_PATH:-/mpi-admision}
+      MPI_OPENHIM_CLIENT_ID: ${MPI_OPENHIM_CLIENT_ID:-bahmni-registro-lab}
+      MPI_OPENHIM_PASSWORD_FILE: /run/secrets/mpi-openhim-client
+      MPI_OPENHIM_CA_FILE: /run/certs/openhim-dev-ca.pem
+      MPI_OPENHIM_TLS_SERVERNAME: ${MPI_OPENHIM_TLS_SERVERNAME:-localhost}
+      OPENMRS_SESSION_URL: https://proxy/openmrs/ws/rest/v1/session
+      OPENMRS_SESSION_TLS_SERVERNAME: localhost
+      OPENMRS_SESSION_CA_FILE: /run/certs/local-dev-ca.pem
+      OPENMRS_REQUIRED_PRIVILEGE: ${MPI_OPENMRS_REQUIRED_PRIVILEGE:-Add Patients}
+      PUBLIC_ORIGIN: https://localhost
+    volumes:
+      - ${MPI_OPENHIM_PASSWORD_FILE:-./mpi-admission-gateway/private/admission-client-pass}:/run/secrets/mpi-openhim-client:ro
+      - ./mpi-admission-gateway/private/openhim-dev-ca.pem:/run/certs/openhim-dev-ca.pem:ro
+      - ./keycloak/tls/local-dev-ca-cert.pem:/run/certs/local-dev-ca.pem:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  bahmni-next-web:
+    environment:
+      NEXT_PUBLIC_MPI_ADMISSION_MODE: ${MPI_ADMISSION_MODE:-preview}
+      NEXT_PUBLIC_MPI_ADMISSION_BASE: /openmrs/mpi-admission-gateway

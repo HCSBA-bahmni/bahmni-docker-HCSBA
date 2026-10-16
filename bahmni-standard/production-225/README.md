@@ -42,3 +42,71 @@ La reversa de frontend consiste en retirar del proxy los defines `NEXT_*` y
 recrear únicamente `proxy`; el fallback `/bahmni` permanece en AngularJS. La
 reversa EIS sigue el orden documentado en `EIS_REGISTRATION.md`: quitar primero
 la referencia al validador y sólo después retirar el OMOD.
+
+## Admisión MPI integrada (06-10-2026)
+
+El despliegue activo suma `production-225/docker-compose.mpi-admission.yml` al
+Compose anterior. La entrega inicial usó `hcsba/bahmni-next-web:2026.10.06-mpi.1`,
+agrega `hcsba/mpi-admission-gateway:2026.10.06.5` y publica el gateway bajo
+`/openmrs/mpi-admission-gateway`. El gateway consulta el canal aislado
+`/mpi225-admision` de OpenHIM `.206`, dirigido al mediador `.227:8533`; ese
+mediador sincroniza con el OpenMRS **de `.225`**, no con el de `.205`.
+
+El visor HTML de la presentación está en
+`https://10.68.174.225/openmrs/mpi-admission-gateway/demo.html`. Usa la sesión
+de la cuenta de Registro, lee PDQm local y PIXm por OpenHIM y recursos FHIR de
+HAPI/OpenMRS, sin exponer credenciales al navegador. El PDQm implementado es
+un subconjunto JSON de ITI-78; `mpi-local-mediator/README.md` enumera sus límites.
+La imagen Next activa `hcsba/bahmni-next-web:2026.10.06-mpi-link.1` añade
+**Comprobar flujo MPI** en búsqueda, alta y edición de Registro. Abre el visor
+en otra pestaña sin poner el RUN en la URL.
+
+El 16-10-2026 se conectó el mediador nacional `.227` al MPI oficial productivo
+mediante los canales separados de OpenHIM `.206`. API Persona quedó como
+contingencia. El gateway `hcsba/mpi-admission-gateway:2026.10.16-mpi-prod.1`
+actualiza el texto del visor para reflejar este origen; el contrato del gateway
+y la imagen Next no cambiaron. La verificación de admisión con refresco obtuvo
+una identidad desde MINSAL y la segunda consulta leyó la copia local vigente.
+
+```sh
+docker compose --project-name bahmni-standard --env-file .env \
+  -f docker-compose.yml -f docker-compose.production-225.yml \
+  -f production-225/docker-compose.mpi-admission.yml \
+  ps proxy bahmni-next-web mpi-admission-gateway
+```
+
+`production-225/mpi/private/` contiene la clave de cliente y CA montadas en el
+gateway; no se versionan. El archivo `production-225/bahmni-proxy.conf.bak-20261006`
+conserva la versión anterior para reversa. La configuración EIS remota y el OMOD
+se mantuvieron. El recorrido, las pruebas y el resto de la reversa están en
+`mediadores-mpi/docs/DESPLIEGUE-BAHMNI-225-MPI-2026-10-06.md`.
+
+## Entrega de permisos de Registro (06-10-2026)
+
+El frontend activo es `hcsba/bahmni-next-web:2026.10.06-registro.1` y conserva
+MPI en modo `integrated`. Este host y todos los ambientes actuales son de
+desarrollo, según confirmación del usuario. El Compose remoto está en
+`/home/arki/bahmni/bahmni-docker-HCSBA/bahmni-standard`.
+
+La imagen se transfirió como archivo Docker con SHA-256
+`120976b51e0e45465768d62a269b70166c7872e003a901407d316e1ae7dea02a`.
+Se cambió el tag de Next en `.env` y en el overlay MPI, y se ejecutó `up -d
+--no-deps --no-build --pull never bahmni-next-web` con los tres archivos Compose
+indicados arriba. Solo se recreó Next; los demás contenedores conservaron sus
+IDs. El servicio quedó `healthy`, y los endpoints públicos de salud de Next y
+biometría respondieron HTTP 200. Las 15 pruebas de perfiles y acceso directo
+pasaron contra la imagen remota en Chromium, Firefox y Edge.
+
+La cuenta `demo.registro` autentica y muestra únicamente Registro, tanto en
+Inicio como en la navegación. Su ubicación disponible es `Registration Desk`.
+Las credenciales se guardan en `.local/development-access.json` del workspace
+local, excluido de Git; la guía del rol está en
+`bahmni-nextjs-hcsba/docs/migration/registration-demo-role.md`.
+
+Para reversa, se conservaron la imagen `2026.10.06-mpi.1` y las copias de los
+dos archivos modificados en
+`production-225/releases/2026.10.06-registro.1/` del host. Restaurar
+`docker-compose.mpi-admission.yml.before` al overlay MPI y `environment.before`
+a `.env`, validar `config --quiet` y recrear solamente `bahmni-next-web` con
+la misma composición. La carpeta de respaldos tiene acceso restringido y no
+se debe versionar su archivo de entorno.

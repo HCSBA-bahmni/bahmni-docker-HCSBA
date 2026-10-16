@@ -1,5 +1,6 @@
 .idea/
 .cache/
+.local/
 **/backup-artifacts/*
 **/restore-artifacts/*
 .DS_Store
@@ -19,4 +20,6 @@ bahmni-standard/openmrs-local/snapshots/
 bahmni-standard/openmrs-local/state/
 bahmni-standard/openmrs-local/generated/
 bahmni-standard/ips-mediator/secrets/
+bahmni-standard/mpi-admission-gateway/private/
 bahmni-standard/production-225/tls/
+bahmni-standard/production-225/mpi/private/

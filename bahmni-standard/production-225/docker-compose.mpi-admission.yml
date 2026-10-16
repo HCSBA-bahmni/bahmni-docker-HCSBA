@@ -1,0 +1,41 @@
+# Admisión MPI del Bahmni de .225. Se suma al Compose base y a production-225.
+services:
+  bahmni-next-web:
+    image: hcsba/bahmni-next-web:2026.10.06-mpi-link.1
+    environment:
+      NEXT_PUBLIC_MPI_ADMISSION_MODE: integrated
+      NEXT_PUBLIC_MPI_ADMISSION_BASE: /openmrs/mpi-admission-gateway
+
+  mpi-admission-gateway:
+    image: hcsba/mpi-admission-gateway:2026.10.16-mpi-prod.1
+    environment:
+      MPI_ADMISSION_MODE: integrated
+      MPI_OPENHIM_BASE_URL: https://10.68.174.206:5000
+      MPI_OPENHIM_ADMISSION_PATH: /mpi225-admision
+      MPI_OPENHIM_CLIENT_ID: bahmni-registro-225
+      MPI_OPENHIM_PASSWORD_FILE: /run/secrets/openhim-client
+      MPI_OPENHIM_CA_FILE: /run/certs/openhim-ca.pem
+      MPI_OPENHIM_TLS_SERVERNAME: localhost
+      OPENMRS_SESSION_URL: https://proxy/openmrs/ws/rest/v1/session
+      OPENMRS_SESSION_TLS_SERVERNAME: localhost
+      OPENMRS_SESSION_CA_FILE: /run/certs/integration-ca.pem
+      OPENMRS_REQUIRED_PRIVILEGE: Add Patients
+      PUBLIC_ORIGIN: https://10.68.174.225
+      MPI_HAPI_FHIR_BASE_URL: http://10.68.174.227:8082/fhir/
+    volumes:
+      - ./production-225/mpi/private/admission-client-pass:/run/secrets/openhim-client:ro
+      - ./production-225/mpi/private/openhim-ca.pem:/run/certs/openhim-ca.pem:ro
+      - ./production-225/tls/hcsba-integration-ca-cert.pem:/run/certs/integration-ca.pem:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped

@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>MPI en vivo · HCSBA</title>
+  <style>
+    :root { --ink:#123247; --muted:#496678; --line:#cddde4; --surface:#fff; --canvas:#f1f7f8; --blue:#155c9c; --teal:#087c88; --soft:#e7f4f4; --green:#176c50; --amber:#8a5b13; --red:#a12e39; --shadow:0 16px 45px rgba(18,50,71,.08); font-family:Inter,"Segoe UI",Arial,sans-serif; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:var(--canvas); line-height:1.5; }
+    a { color:var(--blue); }
+    button,input { font:inherit; }
+    button { cursor:pointer; }
+    button:focus-visible,input:focus-visible,a:focus-visible { outline:3px solid #2e8dce; outline-offset:3px; }
+    .top { background:#10384d; color:#fff; }
+    .top-inner,.wrap { max-width:1380px; margin:auto; padding-left:clamp(18px,3vw,42px); padding-right:clamp(18px,3vw,42px); }
+    .top-inner { min-height:72px; display:flex; align-items:center; justify-content:space-between; gap:18px; }
+    .brand { display:flex; align-items:center; gap:12px; font-weight:800; letter-spacing:.04em; }
+    .brand-mark { width:34px; height:34px; display:grid; place-items:center; border:2px solid #91d7da; border-radius:9px; color:#91d7da; font-size:16px; }
+    .top-links { display:flex; align-items:center; gap:22px; flex-wrap:wrap; }
+    .top-links a { color:#e8f6f7; text-decoration:none; font-weight:600; font-size:14px; }
+    .top-links a:hover { text-decoration:underline; }
+    .wrap { padding-top:38px; padding-bottom:60px; }
+    .eyebrow { color:var(--teal); text-transform:uppercase; letter-spacing:.14em; font-size:12px; font-weight:800; }
+    h1 { margin:8px 0 9px; font-size:clamp(30px,4vw,49px); line-height:1.12; letter-spacing:-.04em; }
+    h2 { font-size:23px; letter-spacing:-.025em; margin:0 0 8px; }
+    h3 { font-size:17px; margin:0; }
+    p { margin:0; }
+    .lead { max-width:770px; color:var(--muted); font-size:17px; }
+    .hero { display:grid; grid-template-columns:minmax(0,1fr) minmax(340px,440px); gap:34px; align-items:end; margin-bottom:30px; }
+    .search { background:var(--surface); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); padding:22px; }
+    label { display:block; font-weight:750; margin-bottom:9px; }
+    .search-row { display:flex; gap:10px; }
+    input { width:100%; min-width:0; border:1px solid #9fb9c8; border-radius:9px; padding:12px 14px; color:var(--ink); background:#fff; font-size:17px; }
+    .primary { border:0; border-radius:9px; padding:11px 20px; background:var(--blue); color:#fff; font-weight:800; min-height:48px; white-space:nowrap; transition:background .2s ease, box-shadow .2s ease; }
+    .primary:hover { background:#0f487c; box-shadow:0 5px 18px rgba(21,92,156,.19); }
+    .primary:disabled { cursor:wait; opacity:.65; }
+    .hint { color:var(--muted); font-size:13px; margin-top:10px; }
+    .error { min-height:0; color:var(--red); font-weight:650; margin-top:8px; }
+    .flow { background:#e5f1f3; border:1px solid #bfdae1; border-radius:16px; padding:21px 22px 24px; margin:0 0 34px; }
+    .section-top { display:flex; align-items:baseline; justify-content:space-between; gap:20px; margin-bottom:15px; }
+    .section-top p { color:var(--muted); font-size:14px; }
+    .steps { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; }
+    .step { position:relative; background:#fff; border:1px solid #b6d3dc; border-radius:12px; padding:16px; min-height:125px; }
+    .step:not(:last-child):after { content:"→"; position:absolute; z-index:1; right:-15px; top:39%; color:var(--teal); font-size:24px; font-weight:800; }
+    .step .num { display:block; color:var(--teal); font-size:12px; font-weight:800; letter-spacing:.07em; margin-bottom:7px; }
+    .step strong { display:block; font-size:16px; }
+    .step small { display:block; color:var(--muted); margin-top:5px; font-size:12px; }
+    .results { display:none; }
+    .results.visible { display:block; }
+    .context { display:flex; flex-wrap:wrap; gap:9px; align-items:center; margin-bottom:16px; }
+    .pill { display:inline-flex; align-items:center; min-height:29px; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:750; background:#e1edf5; color:#17486b; }
+    .pill.ok { color:var(--green); background:#e2f5ea; }
+    .pill.warn { color:var(--amber); background:#fff0d8; }
+    .pill.bad { color:var(--red); background:#fbe5e9; }
+    .overview { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin-bottom:30px; }
+    .metric { border:1px solid var(--line); background:#fff; border-radius:13px; padding:17px 18px; min-height:116px; }
+    .metric span { display:block; color:var(--muted); font-size:12px; font-weight:750; text-transform:uppercase; letter-spacing:.08em; }
+    .metric strong { display:block; margin:4px 0; font-size:26px; line-height:1.15; overflow-wrap:anywhere; }
+    .metric small { color:var(--muted); }
+    .workspace { display:grid; grid-template-columns:minmax(285px,390px) minmax(0,1fr); gap:18px; align-items:start; }
+    .panel { border:1px solid var(--line); border-radius:16px; background:#fff; box-shadow:var(--shadow); overflow:hidden; }
+    .panel-head { padding:18px 20px; border-bottom:1px solid var(--line); }
+    .panel-head p { color:var(--muted); font-size:13px; margin-top:4px; }
+    .op-list { display:grid; gap:1px; background:var(--line); }
+    .op { width:100%; background:#fff; border:0; text-align:left; padding:15px 18px; display:flex; justify-content:space-between; gap:12px; min-height:76px; transition:background .2s ease; }
+    .op:hover { background:#f2f9fb; }
+    .op[aria-current="true"] { background:#e8f4f6; box-shadow:inset 4px 0 var(--teal); }
+    .op-title { display:block; font-size:14px; font-weight:800; }
+    .op-sub { display:block; font-size:12px; color:var(--muted); margin-top:3px; }
+    .state { align-self:center; flex:none; font-size:12px; font-weight:800; }
+    .state.ok { color:var(--green); }.state.warn { color:var(--amber); }.state.bad { color:var(--red); }.state.muted { color:var(--muted); }
+    .detail { padding:20px; }
+    .detail-title { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:12px; }
+    .actions { display:flex; gap:8px; }
+    .secondary { border:1px solid #9fb9c8; background:#fff; color:var(--blue); min-height:40px; padding:7px 12px; border-radius:8px; font-weight:750; }
+    .secondary:hover { background:#eff8fa; }
+    .explain { color:var(--muted); margin:10px 0 17px; }
+    .request-line { font:13px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace; background:#eef5f7; border-radius:8px; padding:11px 12px; overflow-wrap:anywhere; }
+    .subhead { margin:22px 0 8px; color:var(--muted); font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.09em; }
+    .table-wrap { overflow-x:auto; }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    th,td { padding:9px 10px; border-bottom:1px solid #e0e9ed; text-align:left; vertical-align:top; overflow-wrap:anywhere; }
+    th { color:var(--muted); font-size:12px; }
+    .raw { margin:0; max-height:510px; overflow:auto; padding:17px; background:#102e42; color:#e1f3f5; border-radius:9px; font:12px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace; tab-size:2; }
+    .empty { border:1px dashed #9fb9c8; border-radius:9px; padding:18px; color:var(--muted); background:#f7fafb; }
+    .notes { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin-top:30px; }
+    .note { border-left:3px solid var(--teal); padding:5px 0 5px 16px; color:var(--muted); font-size:14px; }
+    .note strong { color:var(--ink); display:block; margin-bottom:4px; }
+    @media(max-width:1000px) { .hero { grid-template-columns:1fr; } .workspace { grid-template-columns:1fr; } .steps { grid-template-columns:repeat(2,1fr); } .step:after { display:none; } }
+    @media(max-width:650px) { .top-inner { padding-top:13px; padding-bottom:13px; align-items:flex-start; flex-direction:column; } .top-links { gap:12px; } .search-row { flex-direction:column; } .steps,.overview,.notes { grid-template-columns:1fr; } .section-top { display:block; } .detail-title { display:block; } .actions { margin-top:12px; } }
+    @media(prefers-reduced-motion:reduce) { *,*:before,*:after { scroll-behavior:auto!important; transition:none!important; animation:none!important; } }
+  </style>
+</head>
+<body>
+  <header class="top"><div class="top-inner"><div class="brand"><span class="brand-mark" aria-hidden="true">+</span><span>HCSBA / MPI EN VIVO</span></div><nav class="top-links" aria-label="Enlaces de demostración"><a href="/registration/patient/new">Volver al registro</a><a href="http://10.68.174.227:8082/fhir/" target="_blank" rel="noreferrer">HAPI FHIR ↗</a></nav></div></header>
+  <main class="wrap">
+    <div class="hero"><div><div class="eyebrow">Demostración de interoperabilidad · entorno de desarrollo</div><h1>Del RUN al recurso FHIR</h1><p class="lead">Consulta el mismo RUN que acabas de usar en admisión. Sigue la respuesta del mediador, la búsqueda demográfica PDQm, la traducción PIXm y los recursos almacenados en HAPI y OpenMRS.</p></div><form class="search" id="search-form"><label for="run">RUN del paciente</label><div class="search-row"><input id="run" name="run" type="text" inputmode="text" autocomplete="off" placeholder="12345678-5" required aria-describedby="run-hint run-error"><button class="primary" id="search-button" type="submit">Ver recorrido</button></div><p class="hint" id="run-hint">Escribe el RUN con guion. La consulta utiliza tu sesión de registro.</p><p class="error" id="run-error" role="alert"></p></form></div>
+    <section class="flow" aria-labelledby="flow-title"><div class="section-top"><h2 id="flow-title">El recorrido que estás viendo</h2><p>Cada tarjeta de abajo muestra una petición y su respuesta real.</p></div><div class="steps"><div class="step"><span class="num">01 · PUNTO DE ATENCIÓN</span><strong>Bahmni / OpenMRS</strong><small>Admisión consulta el RUN o registra la ficha.</small></div><div class="step"><span class="num">02 · BUS DE INTEGRACIÓN</span><strong>OpenHIM · .206</strong><small>Canal de admisión y trazabilidad de la transacción.</small></div><div class="step"><span class="num">03 · RESOLUCIÓN</span><strong>Mediador MPI · .227</strong><small>Busca en OpenCR y, cuando corresponde refrescar, consulta el MPI oficial MINSAL. API Persona queda como contingencia.</small></div><div class="step"><span class="num">04 · PERSISTENCIA</span><strong>HAPI FHIR / OpenMRS</strong><small>Fuente e identidad indexadas; ficha clínica cuando existe.</small></div></div></section>
+    <section class="results" id="results" aria-labelledby="results-title"><div class="section-top"><h2 id="results-title">Resultado de la consulta</h2><p id="checked-at"></p></div><div class="context" id="context" aria-live="polite"></div><div class="overview" id="overview"></div><div class="workspace"><div class="panel"><div class="panel-head"><h3>Operaciones</h3><p>Selecciona una para inspeccionar el FHIR devuelto.</p></div><div class="op-list" id="operation-list"></div></div><article class="panel" id="detail" aria-live="polite"></article></div><div class="notes"><div class="note"><strong>PDQm en el índice local</strong>Lee por CRID y busca por apellido y fecha de nacimiento cuando están disponibles. Es un subconjunto JSON de ITI-78; no consulta MINSAL ni implica conformidad completa con IHE.</div><div class="note"><strong>PIXm es una lectura</strong>Traduce el RUN a un CRID, identificador clínico o UUID de ficha cuando existe la correspondencia. No crea una ficha por sí mismo.</div></div></section>
+  </main>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const form = $('search-form'), input = $('run'), button = $('search-button'), error = $('run-error');
+    let snapshot = null, selected = 'lookup';
+    const descriptions = {
+      lookup: 'La admisión consulta el índice por RUN. Cuando corresponde refrescar, el mediador consulta el MPI oficial MINSAL y guarda su representación FHIR en el índice local.',
+      'pdqm-read': 'ITI-78, subconjunto local: lee la identidad por CRID y muestra el Patient FHIR. Cuando existe, prioriza la fuente nacional persistida para obtener los datos demográficos completos.',
+      pdqm: 'ITI-78, subconjunto local: busca personas por apellido y fecha de nacimiento cuando es completa. No utiliza el RUN como filtro y no llama a MINSAL.',
+      crid: 'PIXm traduce el RUN a la identidad maestra del MPI, sin entregar datos demográficos.',
+      clinical: 'PIXm busca el identificador clínico que Bahmni usa para esta persona en .225.',
+      record: 'PIXm busca el UUID técnico de la ficha OpenMRS .225 asociada a este RUN.',
+      hapi: 'Lectura directa, desde el servidor, de los Patient persistidos en HAPI FHIR con este RUN. Puede haber fuente nacional y registro local.',
+      openmrs: 'Búsqueda FHIR2 de la ficha clínica en OpenMRS .225. Puede estar vacía si la identidad fue consultada pero aún no registrada en Bahmni.'
+    };
+    const make = (tag, className, content) => { const node = document.createElement(tag); if (className) node.className = className; if (content !== undefined) node.textContent = content; return node; };
+    function state(op) { if (op.skipped) return ['Sin datos','muted']; if (op.status === 0 || op.status >= 400) return ['Error','bad']; const total = op.body?.total ?? op.body?.entry?.length ?? op.body?.parameter?.length; return total === 0 ? ['Sin coincidencia','warn'] : ['Disponible','ok']; }
+    function patientEntries(op) { if (op.body?.resourceType === 'Patient') return [op.body]; return (op.body?.entry || []).map((entry) => entry.resource).filter((resource) => resource?.resourceType === 'Patient'); }
+    function rows(op) {
+      if (op.key === 'crid' || op.key === 'clinical' || op.key === 'record') return (op.body?.parameter || []).map((p) => [p.name || 'targetIdentifier', p.valueIdentifier?.system || '—', p.valueIdentifier?.value || '—']);
+      return patientEntries(op).flatMap((patient) => (patient.identifier || []).map((id) => [patient.id || '—', id.system || '—', id.value || '—']));
+    }
+    function addMetric(parent,label,value,detail) { const card=make('div','metric'); card.append(make('span','',label),make('strong','',value),make('small','',detail)); parent.append(card); }
+    function renderOverview() {
+      const operations=snapshot.operations, lookup=operations[0], hapi=operations.find((op)=>op.key==='hapi'), openmrs=operations.find((op)=>op.key==='openmrs');
+      const overview=$('overview'); overview.replaceChildren();
+      addMetric(overview,'Resolución MPI',lookup.mpi?.['x-mpi-outcome'] || state(lookup)[0],lookup.mpi?.['x-mpi-source'] ? `Origen: ${lookup.mpi['x-mpi-source']}` : 'Canal de admisión · OpenHIM');
+      addMetric(overview,'Recursos HAPI',String(hapi.body?.total ?? patientEntries(hapi).length),hapi.status===200 ? 'Patient con este RUN' : 'Consulta no disponible');
+      addMetric(overview,'Ficha OpenMRS',String(openmrs.body?.total ?? patientEntries(openmrs).length),openmrs.status===200 ? 'Patient en FHIR2' : 'Consulta no disponible');
+    }
+    function renderList() {
+      const list=$('operation-list'); list.replaceChildren();
+      for (const op of snapshot.operations) { const item=make('button','op'); item.type='button'; item.setAttribute('aria-current',op.key===selected?'true':'false'); item.addEventListener('click',()=>{selected=op.key; renderList();renderDetail();}); const text=make('span'); text.append(make('span','op-title',op.label),make('span','op-sub',`${op.kind==='pix'?'PIXm · ITI-83':op.kind==='pdqm'?'PDQm · ITI-78':op.kind==='openhim'?'MPI · OpenHIM':op.kind==='hapi'?'FHIR · HAPI':'FHIR2 · OpenMRS'} · ${op.durationMs} ms`)); const badge=make('span',`state ${state(op)[1]}`,state(op)[0]); item.append(text,badge); list.append(item); }
+    }
+    function renderDetail() {
+      const op=snapshot.operations.find((item)=>item.key===selected) || snapshot.operations[0], detail=$('detail'); detail.replaceChildren();
+      const content=make('div','detail'), title=make('div','detail-title'), headline=make('h3','',op.label), actions=make('div','actions');
+      const copy=make('button','secondary','Copiar JSON'); copy.type='button'; copy.disabled=!op.body; copy.addEventListener('click',async()=>{try {await navigator.clipboard.writeText(JSON.stringify(op.body,null,2)); copy.textContent='Copiado'; setTimeout(()=>copy.textContent='Copiar JSON',2000);} catch {copy.textContent='No disponible';}});
+      actions.append(copy); title.append(headline,actions); content.append(title,make('p','explain',descriptions[op.key]));
+      const req=make('div','request-line',`${op.method} ${op.path}`); content.append(req);
+      const meta=make('p','hint',`HTTP ${op.status || '—'} · ${op.durationMs} ms${op.mpi?.['x-correlation-id'] ? ' · Traza '+op.mpi['x-correlation-id'] : ''}`); content.append(meta);
+      if (op.error) content.append(make('div','empty',op.error));
+      else {
+        const extracted=rows(op);
+        content.append(make('div','subhead',op.key==='crid'||op.key==='clinical'||op.key==='record'?'Correspondencias PIXm':'Identificadores de recursos Patient'));
+        if (extracted.length) { const wrap=make('div','table-wrap'), table=make('table'), head=make('thead'), tr=make('tr'); for (const label of ['Recurso / parámetro','Sistema','Valor']) tr.append(make('th','',label)); head.append(tr); table.append(head); const body=make('tbody'); for (const row of extracted) {const r=make('tr'); for (const value of row) r.append(make('td','',value)); body.append(r);} table.append(body);wrap.append(table);content.append(wrap); }
+        else content.append(make('div','empty','Sin identificadores para este RUN en esta operación.'));
+        if (op.mpi && Object.keys(op.mpi).length) {content.append(make('div','subhead','Señales del mediador'));const metadata=make('div','request-line',Object.entries(op.mpi).map(([key,value])=>`${key}: ${value}`).join('\n'));metadata.style.whiteSpace='pre-wrap';content.append(metadata);}
+        content.append(make('div','subhead','Respuesta FHIR completa'),make('pre','raw',JSON.stringify(op.body,null,2)));
+      }
+      detail.append(content);
+    }
+    form.addEventListener('submit',async(event)=>{
+      event.preventDefault();error.textContent='';const run=input.value.trim().toUpperCase();
+      if (!/^\d{1,8}-[\dK]$/.test(run)) {error.textContent='Ingresa un RUN con guion, por ejemplo 12345678-5.';input.focus();return;}
+      button.disabled=true;button.textContent='Consultando…';$('results').classList.remove('visible');
+      try {const response=await fetch(`./demo/data?run=${encodeURIComponent(run)}`,{credentials:'same-origin',headers:{Accept:'application/json'},cache:'no-store'});if(response.status===401) throw new Error('Tu sesión de Bahmni expiró o no tiene permiso de registro.');if(!response.ok) throw new Error('No se pudo consultar el visor MPI.');snapshot=await response.json();selected='lookup';$('results').classList.add('visible');$('checked-at').textContent=new Date(snapshot.checkedAt).toLocaleString('es-CL');const context=$('context');context.replaceChildren(make('span','pill',`RUN ${snapshot.run}`),make('span','pill',`Traza ${snapshot.correlationId}`));renderOverview();renderList();renderDetail();$('results').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});}
+      catch (cause) {error.textContent=cause.message || 'No se pudo completar la consulta.';}
+      finally {button.disabled=false;button.textContent='Ver recorrido';}
+    });
+    const initial=new URL(location.href).searchParams.get('run'); if(initial && /^\d{1,8}-[\dK]$/i.test(initial)) {input.value=initial.toUpperCase();form.requestSubmit();}
+  </script>
+</body>
+</html>

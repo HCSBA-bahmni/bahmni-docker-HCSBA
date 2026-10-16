@@ -11,6 +11,7 @@ $standardDirectory = Join-Path $dockerRepository "bahmni-standard"
 $baseCompose = Join-Path $standardDirectory "docker-compose.yml"
 $devCompose = Join-Path $standardDirectory "docker-compose.next-dev.yml"
 $ipsCompose = Join-Path $standardDirectory "docker-compose.ips-mediator.yml"
+$mpiAdmissionCompose = Join-Path $standardDirectory "docker-compose.mpi-admission.yml"
 $environmentFile = Join-Path $standardDirectory ".env"
 $tlsDirectory = Join-Path $standardDirectory "keycloak\tls"
 $tlsCertificate = Join-Path $tlsDirectory "sso-dev-cert.pem"
@@ -77,6 +78,10 @@ function Test-IpsMediatorEnabled {
     return (Get-DotEnvValue -Path $environmentFile -Name "IPS_MEDIATOR_ENABLED") -eq "true"
 }
 
+function Test-MpiAdmissionEnabled {
+    return (Get-DotEnvValue -Path $environmentFile -Name "MPI_ADMISSION_MODE") -in @("preview", "integrated")
+}
+
 function Get-PemCertificateThumbprint {
     param([string]$Path)
     $pem = [System.IO.File]::ReadAllText($Path)
@@ -127,6 +132,9 @@ function Get-ComposeFileArguments {
         $arguments.Add("-f"); $arguments.Add($ipsCompose)
         $arguments.Add("--profile"); $arguments.Add("ips")
     }
+    if (Test-MpiAdmissionEnabled) {
+        $arguments.Add("-f"); $arguments.Add($mpiAdmissionCompose)
+    }
     return $arguments.ToArray()
 }
 
@@ -168,6 +176,7 @@ function Initialize-Workspace {
         BAHMNI_NEXT_WEB_IMAGE_TAG = "0.1.0-rc.0-ipd-tasks.5"
         CLINICAL_CONSULTATION_ENABLED = "true"
         IPS_MEDIATOR_ENABLED = "false"
+        MPI_ADMISSION_MODE = "off"
         NEXT_PROXY_DEFINES = "-D NEXT_SHELL -D NEXT_REGISTRATION -D NEXT_CLINICAL -D NEXT_BEDMANAGEMENT -D NEXT_ADT -D NEXT_APPOINTMENTS -D NEXT_DOCUMENT_UPLOAD -D NEXT_ORDERS -D NEXT_ADMIN_AUDIT_LOG"
         REPORTS_DB_HOST = "reportsdb"
         RESTART_POLICY = "unless-stopped"
@@ -252,6 +261,22 @@ function Wait-IpsMediatorHealth {
     throw "IPS mediator no estuvo saludable dentro de cuatro minutos."
 }
 
+function Wait-MpiAdmissionHealth {
+    if (-not (Test-MpiAdmissionEnabled)) { return }
+    $deadline = (Get-Date).AddMinutes(4)
+    do {
+        $composeFiles = Get-ComposeFileArguments
+        $containerId = (& docker compose --project-name $composeProjectName --env-file $environmentFile @composeFiles ps -q mpi-admission-gateway).Trim()
+        if ($containerId) {
+            $status = (& docker inspect --format "{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}" $containerId).Trim()
+            if ($status -eq "healthy") { Write-Host "OK  MPI admission gateway" -ForegroundColor Green; return }
+            if ($status -in @("unhealthy", "exited", "dead")) { throw "mpi-admission-gateway termino en estado $status." }
+        }
+        Start-Sleep -Seconds 3
+    } while ((Get-Date) -lt $deadline)
+    throw "MPI admission gateway no estuvo saludable dentro de cuatro minutos."
+}
+
 function Assert-Http200 {
     param([string]$Url)
     # Schannel exige una fuente de revocacion que una CA local de desarrollo no
@@ -285,6 +310,7 @@ function Test-Integration {
     Assert-Command "curl.exe"
     Wait-NextHealth
     Wait-IpsMediatorHealth
+    Wait-MpiAdmissionHealth
     Assert-RootEntryRedirect
     Assert-Http200 "https://localhost/bahmni/api/health"
     Assert-Http200 "https://localhost/biometric-api/health"
@@ -335,6 +361,7 @@ switch ($Action) {
     "logs" {
         $services = @("logs", "-f", "--tail", "160", "proxy", "bahmni-next-web", "bahmni-config", "mpi-biometric-api", "mpi-biometric-db")
         if (Test-IpsMediatorEnabled) { $services += "ips-mediator" }
+        if (Test-MpiAdmissionEnabled) { $services += "mpi-admission-gateway" }
         Invoke-Compose -Arguments $services
     }
     "status" { Invoke-Compose -Arguments @("ps") }

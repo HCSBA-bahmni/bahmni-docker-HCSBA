@@ -4,6 +4,15 @@ Este entorno ejecuta `bahmni-nextjs-hcsba` con Fast Refresh dentro de Docker y c
 
 El script usa el nombre de proyecto Compose fijo `bahmni-hcsba-dev`. Esto evita mezclar o eliminar contenedores de otros workspaces que tambien tengan un directorio llamado `bahmni-standard`.
 
+## Clasificación y acceso de desarrollo
+
+El usuario confirmó el 2026-10-06 que todos los ambientes HCSBA actuales, incluido
+el remoto vigente, son de desarrollo. Los nombres históricos como
+`production-225` no cambian esa clasificación. El administrador de desarrollo
+es `superman`; sus credenciales y las de la demo de Registro se conservan en
+`.local/development-access.json`, excluido de Git. El archivo `../AGENTS.md`
+registra este contexto para futuras sesiones de trabajo.
+
 ## Repositorios
 
 Todos deben quedar como directorios hermanos dentro del mismo workspace.
@@ -82,6 +91,7 @@ Para ejecutar Next.js directamente en el host, detenga solo ese servicio, copie 
 - `bahmni-next-web`: Node 24 Alpine, codigo montado desde el host y dependencias en volumen nombrado.
 - `bahmni-config`: sirve `standard-config-HCSBA` desde el checkout local.
 - `mpi-biometric-api`: ejecuta la API facial desde `api_reconocimiento_facial` y se publica solamente mediante `/biometric-api` en el proxy.
+- `mpi-admission-gateway` (opcional): comprueba sesión y privilegio OpenMRS, consulta OpenHIM por `/openmrs/mpi-admission-gateway` y mantiene su clave de cliente fuera del navegador. El entorno local está en `MPI_ADMISSION_MODE=integrated`: OpenCR/HAPI y OpenMRS son reales de desarrollo. Desde el 16-10-2026 el adaptador nacional compartido `.227` consulta el MPI oficial productivo, con API Persona como contingencia; `preview` conserva una prueba sin guardado clínico.
 - `mpi-biometric-db`: PostgreSQL con pgvector para embeddings biométricos; las fotografías no se persisten.
 - `bahmni-web`: conserva AngularJS para referencia y rutas que aun no han sido cortadas.
 - `ipd`: conserva el microfrontend legacy como referencia/rollback.
@@ -92,6 +102,8 @@ Los OMOD construidos desde `openmrs-module-ipd` y `openmrs-module-eis-identity-h
 ## Variables de entorno
 
 Las variables del navegador estan documentadas en `bahmni-nextjs-hcsba/.example-env`. Solo contienen rutas same-origin y flags publicos. Credenciales de base de datos, correo u otros servicios pertenecen a `bahmni-standard/.env` y nunca deben agregarse como `NEXT_PUBLIC_*`.
+
+La integración MPI de registro y sus límites se describen en `bahmni-nextjs-hcsba/docs/migration/mpi-admission.md`. La configuración del gateway y la prueba manual están en `bahmni-standard/mpi-admission-gateway/README.md`. La clave de cliente OpenHIM reside en un archivo ignorado por Git y se monta en el gateway.
 
 La entrada canonica es `https://localhost`. El proxy la dirige a `/bahmni/home/`; si no hay sesion, Next.js pasa por `/bahmni/login` e inicia el flujo configurado (`openmrs` o `keycloak`). El proxy conserva las cookies de OpenMRS para todas las rutas Next y legacy.
 
