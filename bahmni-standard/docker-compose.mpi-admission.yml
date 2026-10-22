@@ -1,7 +1,7 @@
 services:
   mpi-admission-gateway:
     build: ./mpi-admission-gateway
-    image: hcsba/mpi-admission-gateway:0.1.0
+    image: hcsba/mpi-admission-gateway:2026.10.19-mpi-queue.4
     environment:
       MPI_ADMISSION_MODE: ${MPI_ADMISSION_MODE:-preview}
       MPI_OPENHIM_BASE_URL: ${MPI_OPENHIM_BASE_URL:-http://10.68.174.206:5001}

@@ -1,13 +1,16 @@
-# Admisión MPI del Bahmni de .225. Se suma al Compose base y a production-225.
+# AdmisiÃ³n MPI del Bahmni de .225. Se suma al Compose base y a production-225.
 services:
+  bahmni-config:
+    image: hcsba/standard-config:2026.10.21-patient-management.1
+
   bahmni-next-web:
-    image: hcsba/bahmni-next-web:2026.10.16-visual-mpi.2
+    image: hcsba/bahmni-next-web:2026.10.21-patient-trace.2
     environment:
       NEXT_PUBLIC_MPI_ADMISSION_MODE: integrated
       NEXT_PUBLIC_MPI_ADMISSION_BASE: /openmrs/mpi-admission-gateway
 
   mpi-admission-gateway:
-    image: hcsba/mpi-admission-gateway:2026.10.16-mpi-prod.1
+    image: hcsba/mpi-admission-gateway:2026.10.19-clinical.4
     environment:
       MPI_ADMISSION_MODE: integrated
       MPI_OPENHIM_BASE_URL: https://10.68.174.206:5000

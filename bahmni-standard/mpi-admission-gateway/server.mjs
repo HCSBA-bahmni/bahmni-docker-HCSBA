@@ -196,10 +196,15 @@ function verifiedOpenhimFetch(target, options, config) {
     });
     request.on('timeout', () => request.destroy(new Error('MPI timeout')));
     request.on('error', reject);
-    request.end();
+    request.end(options.body);
   });
 }
 
+export function sessionIdentity(data, privilege) {
+  const active = (name) => data.user?.privileges?.some(p => p.name === name && p.retired !== true && p.retired !== 'true');
+  return data.authenticated === true && Array.isArray(data.user?.privileges) && active(privilege)
+    ? { actor: data.user.username || data.user.uuid, identityManager: active('Manage MPI Identity Reviews') } : false;
+}
 function authenticateSession(request, config) {
   const session = /(?:^|;\s*)JSESSIONID=([^;]+)/.exec(request.headers.cookie || '')?.[1];
   if (!session) return Promise.resolve(false);
@@ -214,7 +219,7 @@ function authenticateSession(request, config) {
         if (response.statusCode !== 200) return resolve(false);
         try {
           const data = JSON.parse(body);
-          resolve(data.authenticated === true && Array.isArray(data.user?.privileges) && data.user.privileges.some((p) => p.name === config.privilege));
+          resolve(sessionIdentity(data, config.privilege));
         } catch (error) { reject(error); }
       });
       response.on('error', reject);
@@ -228,6 +233,16 @@ function authenticateSession(request, config) {
 function allowedRequest(request, config) {
   const url = new URL(request.url, 'http://gateway');
   const admissionPath = config.admissionPath || '/mpi-admision';
+  if (request.method === 'GET' && url.pathname === `${prefix}/_identity` && !url.search) return `${admissionPath}/_identity`;
+  if (config.mode === 'integrated' && url.pathname === `${prefix}/_reviews`) {
+    if (request.method === 'POST' && !url.search) return `${admissionPath}/_reviews`;
+    if (request.method === 'GET' && [...url.searchParams.keys()].every(k => ['patientUuid','offset'].includes(k) && url.searchParams.getAll(k).length === 1)
+      && (!url.searchParams.has('patientUuid') || /^[0-9a-f-]{36}$/i.test(url.searchParams.get('patientUuid')))
+      && (!url.searchParams.has('offset') || /^\d{1,6}$/.test(url.searchParams.get('offset')))) return `${admissionPath}/_reviews${url.search}`;
+  }
+  if (config.mode === 'integrated' && /^\/openmrs\/mpi-admission-gateway\/_reviews\/[0-9a-f-]{36}$/i.test(url.pathname) && request.method === 'GET' && !url.search) return url.pathname.replace(prefix, admissionPath);
+  if (config.mode === 'integrated' && /^\/openmrs\/mpi-admission-gateway\/_reviews\/[0-9a-f-]{36}\/(prepare|resolve|clinical-prepare|consolidate|separation-prepare|separate)$/i.test(url.pathname) && request.method === 'POST' && !url.search) return url.pathname.replace(prefix, admissionPath);
+  if (config.mode === 'integrated' && request.method === 'POST' && url.pathname === `${prefix}/_match` && !url.search) return `${admissionPath}/_match`;
   if (url.pathname === `${prefix}/fhir/Patient` && request.method === 'GET') {
     const identifiers = url.searchParams.getAll('identifier');
     if (!identifiers.length) return demographicPath(url, admissionPath);
@@ -271,6 +286,10 @@ export function createHandler(config, deps = {}) {
     try { authorized = await authenticate(request, config); }
     catch { response.writeHead(502); response.end('OpenMRS session unavailable'); return; }
     if (!authorized) { response.writeHead(401); response.end('Unauthorized'); return; }
+    const reviewRoute = new URL(request.url, 'http://gateway');
+    if (reviewRoute.pathname.startsWith(`${prefix}/_reviews`) && !authorized.identityManager
+      && ((request.method === 'GET' && reviewRoute.pathname === `${prefix}/_reviews` && !reviewRoute.searchParams.has('patientUuid'))
+        || /\/(prepare|resolve|clinical-prepare|consolidate|separation-prepare|separate)$/.test(reviewRoute.pathname))) { response.writeHead(403); response.end('Identity manager privilege required'); return; }
     if (isDemoPage) {
       response.setHeader('Referrer-Policy', 'no-referrer');
       response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -288,16 +307,34 @@ export function createHandler(config, deps = {}) {
     }
     try {
       const target = new URL(path, config.upstream);
+      let requestBody;
+      if (request.method === 'POST') {
+        const chunks = []; let size = 0;
+        for await (const chunk of request) {
+          size += chunk.length;
+          if (size > 32768) { response.writeHead(413); response.end(); return; }
+          chunks.push(chunk);
+        }
+        requestBody = Buffer.concat(chunks);
+        if (requestBody.length) {
+          try { JSON.parse(requestBody.toString('utf8')); }
+          catch { response.writeHead(400); response.end(); return; }
+        }
+      }
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 20000);
       let upstream;
       try {
         upstream = await upstreamFetch(target, {
           method: request.method, signal: controller.signal,
+          body: requestBody?.length ? requestBody : undefined,
           headers: {
             Authorization: `Basic ${Buffer.from(`${config.username}:${config.password}`).toString('base64')}`,
             Accept: request.method === 'GET' ? 'application/fhir+json' : 'application/json',
             'X-Correlation-Id': randomUUID(),
+            ...(requestBody?.length ? { 'Content-Type': 'application/json' } : {}),
+            ...(authorized.actor ? { 'X-MPI-Actor': String(authorized.actor).replace(/[\r\n]/g, '').slice(0, 128) } : {}),
+            'X-MPI-Identity-Manager': authorized.identityManager === true ? 'true' : 'false',
           },
         });
       } finally { clearTimeout(timeout); }

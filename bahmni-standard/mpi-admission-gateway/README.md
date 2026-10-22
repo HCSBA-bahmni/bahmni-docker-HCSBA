@@ -1,6 +1,8 @@
 # Gateway de admisión MPI
 
-Sirve `/openmrs/mpi-admission-gateway/fhir/Patient?identifier=<RUN>` y, en modo `integrated`, `POST /openmrs/mpi-admission-gateway/_sync/<UUID>`. Valida la cookie `JSESSIONID` contra la sesión OpenMRS y exige el privilegio `Add Patients` antes de usar la credencial OpenHIM del archivo secreto. Reenvía las cabeceras `X-MPI-*` que el formulario necesita. No recibe ni registra datos de pacientes en logs.
+Sirve `/openmrs/mpi-admission-gateway/fhir/Patient?identifier=<RUN>`, `GET /_identity` y, en modo `integrated`, `POST /_match` y `POST /_sync/<UUID>` bajo el mismo prefijo. Valida la cookie `JSESSIONID` contra la sesión OpenMRS y exige el privilegio `Add Patients` antes de usar la credencial OpenHIM del archivo secreto. Reenvía las cabeceras `X-MPI-*` que el formulario necesita. Los documentos/demografía viajan en el cuerpo de matching y la decisión firmada viaja en sync; no se registran en logs.
+
+Desde el 19-10-2026, Registro usa matching de OpenCR antes de guardar, incluso sin RUN. El gateway limita los cuerpos JSON a 32 KiB, exige mismo origen y genera `X-MPI-Actor` desde la sesión validada. OpenHIM conserva esa cabecera hasta el mediador. La revisión humana y la firma se resuelven en Registro/mediador; el gateway no inventa coincidencias ni puntajes. En `.225` las imágenes Next y gateway están fijadas en `2026.10.19-mpi-identity.1`.
 
 ## Visor de demostración
 
@@ -14,7 +16,7 @@ contrato FHIR. La búsqueda demográfica PDQm y las traducciones PIXm de esta p�
 del MPI **local**, no llamadas al MPI nacional. Una consulta local vigente puede no salir a MINSAL
 por la ventana de refresco; el encabezado `X-MPI-Decision` permite comprobarlo.
 
-El navegador nunca recibe credenciales OpenHIM ni acceso directo a HAPI por API. El gateway consulta destinos configurados, sin URL arbitraria, y solo admite GET con RUN validado. Las respuestas usan `Cache-Control: no-store`. HAPI se configura en el contenedor con `MPI_HAPI_FHIR_BASE_URL`; OpenMRS se consulta por HTTPS con la misma cookie de sesión. El botón superior a HAPI abre su interfaz de desarrollo existente para mostrarla aparte.
+El navegador nunca recibe credenciales OpenHIM ni acceso directo a HAPI por API. El gateway consulta destinos configurados, sin URL arbitraria, con rutas y métodos permitidos explícitamente. Las respuestas usan `Cache-Control: no-store`. HAPI se configura en el contenedor con `MPI_HAPI_FHIR_BASE_URL`; OpenMRS se consulta por HTTPS con la misma cookie de sesión. El botón superior a HAPI abre su interfaz de desarrollo existente para mostrarla aparte.
 
 En `preview`, el POST está prohibido. En `integrated`, el gateway exige HTTPS hacia OpenHIM y valida su certificado con una CA montada. El navegador solo conoce la ruta del mismo origen.
 
@@ -32,3 +34,11 @@ El certificado público de OpenHIM va en `private/openhim-dev-ca.pem`; `MPI_OPEN
 Prueba manual: entrar en `https://10.68.174.225/bahmni/registration/patient/new` con una cuenta que tenga `Add Patients`, consultar un RUN autorizado por su titular y comparar la tarjeta MPI con el visor de demostración. No usar los RUN sintéticos del mock para verificar el MPI productivo. En caso de 401, comprobar primero sesión y privilegio OpenMRS; el gateway no acepta credenciales del navegador para OpenHIM.
 
 Pruebas del gateway: `node --test server.test.mjs`.
+
+## Revisión diferida de identidad
+
+La entrega `2026.10.19-mpi-queue.4` permite `/_reviews`, `/_reviews/{id}`, `/_reviews/{id}/prepare` y `/_reviews/{id}/resolve` sólo en modo integrado. El listado general (también paginado con `offset`) y las acciones de preparación/resolución requieren el privilegio activo **Manage MPI Identity Reviews** de la sesión OpenMRS. La consulta acotada por `patientUuid` y el envío de una propuesta permanecen disponibles para admisión.
+
+El gateway sobrescribe `X-MPI-Actor` y `X-MPI-Identity-Manager` con la identidad y el permiso comprobados en servidor. Las cabeceras del navegador no elevan permisos. Un `review.caseId` en `/_sync/{uuid}` activa una propuesta durable después de verificar la ficha; no adjudica desde admisión.
+
+La cola y la auditoría se conservan en el volumen persistente del mediador. No borrar el volumen para revertir una imagen. Contrato: `mediadores-mpi/docs/MPI-REVISION-DIFERIDA-2026-10-19.md`. Perfiles: `bahmni-nextjs-hcsba/docs/migration/registration-demo-role.md`.

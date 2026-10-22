@@ -1,9 +1,43 @@
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { after, before, test } from 'node:test';
-import { allowedRequest, createHandler } from './server.mjs';
+import { allowedRequest, createHandler, sessionIdentity } from './server.mjs';
 
 const calls = [];
+test('manager access requires an active privilege from the trusted session', () => {
+  const data = { authenticated: true, user: { username: 'admission', privileges: [{ name: 'Add Patients' }, { name: 'Manage MPI Identity Reviews', retired: 'true' }] } };
+  assert.equal(sessionIdentity(data, 'Add Patients').identityManager, false);
+  data.user.privileges[1].retired = false;
+  assert.equal(sessionIdentity(data, 'Add Patients').identityManager, true);
+  data.authenticated = false;
+  assert.equal(sessionIdentity(data, 'Add Patients'), false);
+});
+test('admission cannot forge a manager header; manager routes use verified identity', async t => {
+  const forwarded = [];
+  const app = http.createServer(createHandler({ mode: 'integrated', publicOrigin: 'https://localhost', upstream: new URL('http://127.0.0.1:5001'), username: 'test', password: 'synthetic' }, {
+    authenticate: async req => ({ actor: req.headers.cookie === 'manager' ? 'gestor' : 'admisor', identityManager: req.headers.cookie === 'manager' }),
+    fetch: async (_url, options) => { forwarded.push(options); return new Response('{}'); },
+  }));
+  await new Promise(resolve => app.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise(resolve => app.close(resolve)));
+  const root = `http://127.0.0.1:${app.address().port}/openmrs/mpi-admission-gateway/_reviews`;
+  const id = '11111111-1111-4111-8111-111111111111';
+  const headers = { Origin: 'https://localhost', 'Content-Type': 'application/json', 'X-MPI-Identity-Manager': 'true', 'X-MPI-Actor': 'forged' };
+  assert.equal((await fetch(root, { headers })).status, 403);
+  assert.equal((await fetch(root+'?offset=100', { headers })).status, 403);
+  assert.equal((await fetch(root+'?offset=-1', { headers })).status, 404);
+  assert.equal((await fetch(`${root}/${id}/resolve`, { method: 'POST', headers, body: '{}' })).status, 403);
+  for (const action of ['clinical-prepare','consolidate','separation-prepare','separate']) {
+    assert.equal((await fetch(`${root}/${id}/${action}`, { method: 'POST', headers, body: '{}' })).status, 403);
+  }
+  assert.equal(forwarded.length, 0);
+  assert.equal((await fetch(root, { method: 'POST', headers, body: '{}' })).status, 200);
+  assert.equal(forwarded.at(-1).headers['X-MPI-Identity-Manager'], 'false');
+  assert.equal(forwarded.at(-1).headers['X-MPI-Actor'], 'admisor');
+  assert.equal((await fetch(`${root}/${id}/resolve`, { method: 'POST', headers: { ...headers, Cookie: 'manager' }, body: '{}' })).status, 200);
+  assert.equal(forwarded.at(-1).headers['X-MPI-Identity-Manager'], 'true');
+  assert.equal(forwarded.at(-1).headers['X-MPI-Actor'], 'gestor');
+});
 const config = {
   mode: 'preview', publicOrigin: 'https://localhost', upstream: new URL('http://127.0.0.1:5001'),
   username: 'lab-client', password: 'synthetic-secret', privilege: 'Add Patients',
@@ -27,6 +61,24 @@ test('preview only accepts authenticated exact identifier lookup and returns MPI
   assert.equal(calls.at(-1).url, 'http://127.0.0.1:5001/mpi-admision/fhir/Patient?identifier=12345678-5');
   assert.equal(calls.at(-1).options.headers.Authorization, `Basic ${Buffer.from('lab-client:synthetic-secret').toString('base64')}`);
   assert.equal(calls.at(-1).options.headers.Cookie, undefined);
+});
+
+test('matching is bounded, same-origin and authenticated; actor comes from the server session', async t => {
+  let received;
+  const app = http.createServer(createHandler({ ...config, mode: 'integrated' }, {
+    authenticate: async () => ({ actor: 'verified-operator' }),
+    fetch: async (_url, options) => { received = options; return new Response('{}'); },
+  }));
+  await new Promise(resolve => app.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise(resolve => app.close(resolve)));
+  const url = `http://127.0.0.1:${app.address().port}/openmrs/mpi-admission-gateway/_match`;
+  const result = await fetch(url, { method: 'POST', headers: { Origin: 'https://localhost', 'X-MPI-Actor': 'forged', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ patient: { resourceType: 'Patient' } }) });
+  assert.equal(result.status, 200);
+  assert.equal(received.headers['X-MPI-Actor'], 'verified-operator');
+  assert.equal(JSON.parse(received.body).patient.resourceType, 'Patient');
+  assert.equal((await fetch(url, { method: 'POST', headers: { Origin: 'https://elsewhere' } })).status, 403);
+  assert.equal((await fetch(url, { method: 'POST', headers: { Origin: 'https://localhost' }, body: 'x'.repeat(32769) })).status, 413);
 });
 
 test('preview forbids clinical writes and unauthenticated queries', async () => {
