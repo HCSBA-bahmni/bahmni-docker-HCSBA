@@ -1,7 +1,7 @@
 # AdmisiÃ³n MPI del Bahmni de .225. Se suma al Compose base y a production-225.
 services:
   bahmni-config:
-    image: hcsba/standard-config:2026.10.21-patient-management.1
+    image: hcsba/standard-config:2026.10.26-hide-ot.2
 
   bahmni-next-web:
     image: hcsba/bahmni-next-web:2026.10.21-patient-trace.2
