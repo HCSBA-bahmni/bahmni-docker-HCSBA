@@ -54,4 +54,7 @@ regla general `/openmrs`. Esta ruta requiere el servicio opcional
 `mpi-admission-gateway` configurado en el ambiente; el proxy por sí solo no
 instala el gateway ni habilita MPI. Las credenciales del gateway permanecen
 en el servidor. El proxy de `.225` usa su OpenMRS local; el proxy dev normal
-continúa apuntando a `.205`.
+apunta a `.225` desde el 28-10-2026 por decisión del responsable. El proxy local
+valida TLS con la CA pública de integración montada en Compose; el servicio
+documental del overlay dev utiliza el mismo backend. `.205` queda como referencia
+histórica, no como fallback de sesión.

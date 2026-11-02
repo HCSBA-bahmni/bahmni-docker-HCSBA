@@ -1,4 +1,10 @@
 services:
+  # Keep document-service authentication on the same DEV HIS as Apache.
+  # Override the historical .env value without modifying local secrets.
+  patient-documents:
+    environment:
+      OPENMRS_HOST: 10.68.174.225
+
   proxy:
     command: /bin/sh -c 'exec httpd-foreground $${NEXT_PROXY_DEFINES}'
     environment:

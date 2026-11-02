@@ -1,5 +1,23 @@
 # Entorno de desarrollo HCSBA Bahmni
 
+## Backend vigente desde el 28-10-2026
+
+Por indicación del responsable, el Docker local utiliza OpenMRS de desarrollo
+`.225`. Las referencias históricas a `.205` en esta guía corresponden al ambiente
+basal anterior y no al destino actual. Apache dirige OpenMRS, autenticación,
+documentos y OpenELIS a `.225`; el overlay Next dev fija también OPENMRS_HOST
+del servicio documental. No se modificó el archivo `.env` operativo.
+
+El proxy monta solamente la CA pública `bahmni-standard/hcsba-integration-ca-cert.pem`
+y verifica certificado, hostname y vigencia del backend. El montaje existe en
+Compose base para conservarlo al restaurar la imagen versionada de Next.
+`bootstrap` prepara instalaciones futuras con OPENMRS_HOST `.225`.
+Los servicios opcionales no levantados que lean el antiguo `.env` requieren
+revisión explícita antes de habilitarlos; no se activan como parte de este cambio.
+
+Después del cambio de HIS, cerrar cualquier sesión previa y volver a iniciar
+sesión: no reutilizar cookies ni UUID de pacientes del ambiente `.205`.
+
 Este entorno ejecuta `bahmni-nextjs-hcsba` con Fast Refresh dentro de Docker y conserva el mismo origen de la instalacion integrada: `https://localhost`. Apache dirige OpenMRS al ambiente HCSBA `.205`, sirve la configuracion local y mantiene las aplicaciones legacy disponibles para comparar paridad.
 
 El script usa el nombre de proyecto Compose fijo `bahmni-hcsba-dev`. Esto evita mezclar o eliminar contenedores de otros workspaces que tambien tengan un directorio llamado `bahmni-standard`.

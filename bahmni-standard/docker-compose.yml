@@ -20,6 +20,7 @@ services:
     command: /bin/sh -c 'exec httpd-foreground $${NEXT_PROXY_DEFINES}'
     volumes:
       - ./bahmni-proxy.conf:/usr/local/apache2/conf/bahmni-proxy.conf:ro
+      - ./hcsba-integration-ca-cert.pem:/etc/tls/hcsba-integration-ca-cert.pem:ro
       # - ${CERTIFICATE_PATH}:/etc/tls
     ports:
       - '80:80'
