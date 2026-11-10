@@ -1,4 +1,11 @@
 services:
+  # DEV configuration comes from the checkout. The image start.sh copies its
+  # bundled /etc/bahmni_config over this bind mount on EVERY restart.
+  bahmni-config:
+    command: ["/bin/sh", "-c", "exec sleep infinity"]
+    volumes:
+      - ../../standard-config-HCSBA:/usr/local/bahmni_config:ro
+
   # Keep document-service authentication on the same DEV HIS as Apache.
   # Override the historical .env value without modifying local secrets.
   patient-documents:
