@@ -61,3 +61,7 @@ run-bahmni.sh .env.local
 Please choose the appropriate environment variables file based on your requirements and make sure the respective `.env` or `.env-dev` file is properly configured before running the commands.
 
 For detailed instructions and further information, please refer to the [Wiki Page](https://bahmni.atlassian.net/wiki/spaces/BAH/pages/299630726/Running+Bahmni+on+Docker) mentioned above.
+
+## QA compartido del HIS HCSBA
+
+El paquete [his-qa-release](skills/his-qa-release/SKILL.md) incluye el flujo PRE/POST, referencias y plantillas para QA de desarrollos y entregas a `.225`. Consultar la [guía para contribuyentes](skills/his-qa-release/references/contributors.md) para instalar la skill completa y ejecutar el harness mantenido en `bahmni-nextjs-hcsba`. Conservar informes y datos de prueba en una carpeta privada fuera de Git.

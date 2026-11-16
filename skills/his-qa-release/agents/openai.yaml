@@ -1,0 +1,4 @@
+interface:
+  display_name: "QA HIS y entregas .225"
+  short_description: "Pauta QA con evidencia y aceptación por entrega"
+  default_prompt: "Usa $his-qa-release para preparar y evaluar la pauta QA de este desarrollo y su entrega a .225."
