@@ -1,0 +1,73 @@
+<!doctype html>
+<!-- Entregar como qa-<modulo-o-flujo>-<aaaa-mm-dd>-rNN.html; ver references/report-design.md. -->
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{TITULO_DOCUMENTO}}</title>
+  <style>{{REPORT_CSS}}</style>
+</head>
+<body>
+  <a class="skip" href="#contenido">Ir al contenido</a>
+  <div class="masthead">
+    <div class="brand">HIS HCSBA</div>
+    <div class="document-type">Informe de pruebas · {{FECHA_CIERRE}}</div>
+  </div>
+  <main id="contenido">
+    <header class="hero" id="resultado">
+      <div class="eyebrow">{{FLUJO_REVISADO}}</div>
+      <h1>{{TITULO_RESULTADO}}</h1>
+      <p class="intro">{{RESUMEN_DEL_ALCANCE}}</p>
+      <div class="decision {{CLASE_ESTADO}}">
+        <div><strong>{{DICTAMEN_DEL_HARNESS}}</strong><p>{{RESULTADO_EN_PALABRAS_CLARAS}}</p></div>
+      </div>
+      <div class="hero-meta"><span><b>Ambiente:</b> {{AMBIENTE}}</span><span><b>Cierre:</b> {{FECHA_HORA_CIERRE}}</span></div>
+    </header>
+    <nav aria-label="Contenido del informe">
+      <a href="#pruebas">Qué se probó</a>
+      <a href="#correcciones">Qué se corrigió</a>
+      <a href="#pendientes">Pendientes y alcance</a>
+      <a href="#respaldo">Detalle y documentos</a>
+    </nav>
+    <section class="section" aria-labelledby="esencial">
+      <h2 id="esencial">Lo esencial</h2>
+      <div class="essential">{{HASTA_TRES_IDEAS_CLAVE_HTML}}</div>
+    </section>
+    <section class="section" id="pruebas" aria-labelledby="pruebas-titulo">
+      <h2 id="pruebas-titulo">Qué se probó</h2>
+      <p class="section-lead">Cada tarea incluye un resumen. Abre el detalle si necesitas ver lo esperado, lo que ocurrió y la evidencia.</p>
+      <div class="tasks">{{TAREAS_CON_ESTADO_Y_DETALLE_HTML}}</div>
+    </section>
+    <section class="section" id="correcciones" aria-labelledby="correcciones-titulo">
+      <h2 id="correcciones-titulo">Qué se corrigió</h2>
+      <div class="panel"><ul class="changes">{{CORRECCIONES_COMPROBADAS_HTML}}</ul></div>
+    </section>
+    <section class="section" id="pendientes" aria-labelledby="pendientes-titulo">
+      <h2 id="pendientes-titulo">Pendientes y alcance</h2>
+      <div class="panel pending {{CLASE_PENDIENTES}}">{{PENDIENTES_EFECTO_ACCION_RESPONSABLE_HTML}}</div>
+      <div class="limits"><h3>Quedó fuera de estas pruebas</h3>{{LIMITES_DE_ALCANCE_HTML}}</div>
+    </section>
+    <section class="section" aria-labelledby="completitud">
+      <h2 id="completitud">{{TITULO_ESTADO_DEL_TRABAJO}}</h2>
+      <div class="panel">{{REALIZADAS_PREVISTAS_APROBADAS_DESDE_HARNESS_HTML}}</div>
+    </section>
+    <section class="section" aria-labelledby="datos">
+      <h2 id="datos">Cómo quedaron los datos de prueba</h2>
+      <div class="panel">{{ESTADO_FINAL_DATOS_Y_CAPTURA_OPCIONAL_HTML}}</div>
+    </section>
+    <section class="section" id="respaldo" aria-labelledby="respaldo-titulo">
+      <h2 id="respaldo-titulo">Detalle y documentos de respaldo</h2>
+      <p class="section-lead">La pauta contiene el resultado esperado, lo observado y la evidencia de cada comprobación.</p>
+      <div class="buttons">
+        <a class="button" href="{{CSV_URL}}" download>Descargar pauta de pruebas</a>
+        <a class="button secondary" href="{{INFORME_TECNICO_URL}}">Abrir informe técnico completo</a>
+      </div>
+      <details class="support">
+        <summary>Información para QA y desarrollo</summary>
+        <div class="detail-body">{{CRITERIOS_METRICAS_VERSION_INCIDENCIAS_EVIDENCIAS_HTML}}</div>
+      </details>
+    </section>
+    <footer>HIS HCSBA · {{FLUJO_REVISADO}} · Resultados al {{FECHA_CIERRE}} · America/Santiago.</footer>
+  </main>
+</body>
+</html>
