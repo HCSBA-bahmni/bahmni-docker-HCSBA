@@ -270,7 +270,7 @@ function Start-LocalStack {
     Invoke-EisIdentityDatabase "migrate"
     Invoke-Compose @("up", "-d", "openmrs-local")
     Invoke-Compose @("up", "-d", "patient-documents", "bahmni-web", "bahmni-next-web", "proxy")
-    Write-Host "Stack local activo. /openmrs apunta al clon local; .205 no recibe escrituras." -ForegroundColor Green
+    Write-Host "Stack local activo. /openmrs apunta al clon local; .225 no recibe escrituras." -ForegroundColor Green
 }
 
 function Test-LocalStack {
@@ -311,7 +311,7 @@ function Switch-ToRemote {
         if ($LASTEXITCODE -ne 0) { throw "No fue posible restaurar el back-channel de OpenMRS compartido." }
     } finally { Pop-Location }
     Invoke-Compose -WithoutLocal @("up", "-d", "proxy", "bahmni-next-web")
-    Write-Host "Proxy restaurado al backend compartido .205. Los volumenes locales se conservaron." -ForegroundColor Green
+    Write-Host "Proxy restaurado al backend compartido .225. Los volumenes locales se conservaron." -ForegroundColor Green
 }
 
 Assert-Command "docker"

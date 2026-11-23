@@ -164,7 +164,7 @@ function Initialize-Workspace {
     $environmentValues = [ordered]@{
         COMPOSE_PROFILES = "emr"
         TZ = "America/Santiago"
-        OPENMRS_HOST = "10.68.174.205"
+        OPENMRS_HOST = "10.68.174.225"
         OPENMRS_PORT = "443"
         CONFIG_VOLUME = Convert-ToComposePath (Join-Path $workspace "standard-config-HCSBA")
         BAHMNI_APPS_PATH = Convert-ToComposePath (Join-Path $workspace "openmrs-module-bahmniapps-hcsba-2024")
@@ -205,7 +205,7 @@ function Initialize-Workspace {
     }
 
     Write-Host "Workspace preparado en $workspace" -ForegroundColor Green
-    Write-Host "Backend de integracion: https://10.68.174.205/openmrs" -ForegroundColor Cyan
+    Write-Host "Backend de integracion: https://10.68.174.225/openmrs" -ForegroundColor Cyan
 }
 
 function Invoke-Compose {
